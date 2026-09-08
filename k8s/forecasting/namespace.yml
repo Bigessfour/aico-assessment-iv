@@ -1,0 +1,15 @@
+# =============================================================================
+# Namespace — isolation boundary on the shared class EKS cluster
+# =============================================================================
+# Talking points:
+#   - Every forecasting resource (pods, services, secrets, quotas) lives HERE.
+#   - Prevents name collisions with recommendations / forecasting teams.
+#   - Soft multi-tenancy: one cluster, many team namespaces.
+# =============================================================================
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: forecasting
+  labels:
+    team: forecasting
+    app.kubernetes.io/part-of: ml-platform

@@ -127,9 +127,29 @@ curl http://127.0.0.1:18000/ready
 
 ---
 
+## Recommendations + Forecasting teams — end state (2026-09-08)
+
+Starter-guide approach: duplicate the proven fraud vertical slice per team
+with team-specific namespaces, ConfigMaps, and SageMaker endpoint names.
+
+| Team | Namespace | Image | Endpoint | Pod |
+|------|-----------|-------|----------|-----|
+| Fraud | `fraud` | `ghcr.io/bigessfour/fraud-detection:latest` | `aico-iv-fraud` | 1/1 Ready |
+| Recommendations | `recommendations` | `ghcr.io/bigessfour/recommendations:latest` | `aico-iv-recs` | 1/1 Ready |
+| Forecasting | `forecasting` | `ghcr.io/bigessfour/forecasting:latest` | `aico-iv-forecast` | 1/1 Ready |
+
+**Routing isolation verified** (pod env `ENDPOINT_NAME`):
+
+- fraud → `aico-iv-fraud`
+- recommendations → `aico-iv-recs`
+- forecasting → `aico-iv-forecast`
+
+Both new services used `--platform linux/amd64` from the start (lesson from fraud ImagePullBackOff).
+
+---
+
 ## Still to do (platform)
 
-- Duplicate pattern for `recommendations` (`aico-iv-recs`) and `forecasting` (`aico-iv-forecast`)
 - Terraform lifecycle + optional remote state / k8s provider
 - GitHub Actions deploy workflow (build matrix, apply, verify)
 - React ops dashboard

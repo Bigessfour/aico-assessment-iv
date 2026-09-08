@@ -10,7 +10,7 @@ on:
 
 jobs:
   validate:
-    name: Validate fraud service + manifests
+    name: Validate services + manifests
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -20,15 +20,22 @@ jobs:
         with:
           python-version: "3.11"
 
-      - name: Syntax-check FastAPI app
-        run: python -m py_compile services/fraud-detection/app.py
-
-      - name: Confirm required k8s fraud manifests exist
+      - name: Syntax-check FastAPI apps
         run: |
           set -e
-          for f in namespace configmap deployment service quota secret.example; do
-            test -f "k8s/fraud/${f}.yml"
-            echo "ok k8s/fraud/${f}.yml"
+          for svc in fraud-detection recommendations forecasting; do
+            python -m py_compile "services/${svc}/app.py"
+            echo "ok services/${svc}/app.py"
+          done
+
+      - name: Confirm required k8s manifests per team
+        run: |
+          set -e
+          for team in fraud recommendations forecasting; do
+            for f in namespace configmap deployment service quota secret.example; do
+              test -f "k8s/${team}/${f}.yml"
+              echo "ok k8s/${team}/${f}.yml"
+            done
           done
 
       - name: Confirm History.md present
