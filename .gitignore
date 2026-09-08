@@ -9,3 +9,7 @@ __pycache__/
 *.pyc
 .venv/
 venv/
+# Never commit real k8s secrets (use secret.example.yml as the template only)
+k8s/**/secret.yml
+k8s/**/secret.yaml
+**/ghcr-secret.yml

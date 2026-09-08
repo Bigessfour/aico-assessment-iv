@@ -1,0 +1,32 @@
+# ResourceQuota caps how much the fraud namespace can consume on the shared cluster.
+apiVersion: v1
+kind: ResourceQuota
+metadata:
+  name: fraud-quota
+  namespace: fraud
+spec:
+  hard:
+    requests.cpu: "1"
+    requests.memory: 1Gi
+    limits.cpu: "2"
+    limits.memory: 2Gi
+    pods: "4"
+---
+# LimitRange sets defaults/max for containers that omit resources.
+apiVersion: v1
+kind: LimitRange
+metadata:
+  name: fraud-limits
+  namespace: fraud
+spec:
+  limits:
+    - type: Container
+      defaultRequest:
+        cpu: "100m"
+        memory: "128Mi"
+      default:
+        cpu: "250m"
+        memory: "256Mi"
+      max:
+        cpu: "500m"
+        memory: "512Mi"

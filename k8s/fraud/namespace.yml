@@ -1,0 +1,10 @@
+# Namespace = hard isolation boundary on a shared cluster.
+# Fraud team's pods/services/quotas all live here so they cannot
+# accidentally collide with recommendations or forecasting names.
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: fraud
+  labels:
+    team: fraud
+    app.kubernetes.io/part-of: ml-platform

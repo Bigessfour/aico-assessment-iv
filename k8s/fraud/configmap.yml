@@ -1,0 +1,12 @@
+# ConfigMap = non-secret config injected as env vars.
+# Endpoint name and region are not credentials — safe to commit.
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: fraud-config
+  namespace: fraud
+data:
+  ENDPOINT_NAME: "aico-iv-fraud"
+  AWS_REGION: "us-east-1"
+  LOG_LEVEL: "info"
+  INVOKE_TIMEOUT_SECONDS: "10"

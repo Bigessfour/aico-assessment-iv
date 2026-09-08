@@ -1,0 +1,60 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: fraud-api
+  namespace: fraud
+  labels:
+    app: fraud-api
+    team: fraud
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: fraud-api
+  template:
+    metadata:
+      labels:
+        app: fraud-api
+        team: fraud
+    spec:
+      containers:
+        - name: fraud-api
+          image: ghcr.io/bigessfour/fraud-detection:latest
+          imagePullPolicy: Always
+          ports:
+            - containerPort: 8000
+          envFrom:
+            - configMapRef:
+                name: fraud-config
+            - secretRef:
+                name: fraud-aws-creds
+          # Startup: give the process time to boot before liveness kills it
+          startupProbe:
+            httpGet:
+              path: /health
+              port: 8000
+            failureThreshold: 12
+            periodSeconds: 5
+          # Readiness: only send traffic if /ready is 200
+          readinessProbe:
+            httpGet:
+              path: /ready
+              port: 8000
+            initialDelaySeconds: 5
+            periodSeconds: 10
+          # Liveness: restart the container if /health fails repeatedly
+          livenessProbe:
+            httpGet:
+              path: /health
+              port: 8000
+            initialDelaySeconds: 15
+            periodSeconds: 20
+          resources:
+            requests:
+              memory: "128Mi"
+              cpu: "100m"
+            limits:
+              memory: "256Mi"
+              cpu: "250m"
+      imagePullSecrets:
+        - name: ghcr-secret
