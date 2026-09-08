@@ -1,0 +1,25 @@
+# =============================================================================
+# Service — stable virtual IP in front of recommendations-api pods
+# =============================================================================
+# Talking points:
+#   - ClusterIP: reachable only inside the cluster (good default for internal APIs).
+#   - selector app=recommendations-api: load-balances to matching Ready pods.
+#   - port 80 → targetPort 8000: callers use :80; container still listens on 8000.
+#   - Demo from laptop: kubectl -n fraud port-forward svc/recommendations-api 18000:80
+# =============================================================================
+apiVersion: v1
+kind: Service
+metadata:
+  name: recommendations-api
+  namespace: recommendations
+  labels:
+    app: recommendations-api
+    team: recommendations
+spec:
+  type: ClusterIP
+  selector:
+    app: recommendations-api
+  ports:
+    - protocol: TCP
+      port: 80
+      targetPort: 8000

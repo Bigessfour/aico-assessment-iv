@@ -1,0 +1,19 @@
+# =============================================================================
+# ConfigMap — non-secret configuration injected as environment variables
+# =============================================================================
+# Talking points:
+#   - Safe to commit: endpoint name, region, timeouts are not credentials.
+#   - Deployment uses envFrom.configMapRef → becomes process env in the pod.
+#   - ENDPOINT_NAME MUST be aico-iv-recs for this team (routing isolation).
+#   - Change endpoint without rebuilding the image — just edit + kubectl apply.
+# =============================================================================
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: recommendations-config
+  namespace: recommendations
+data:
+  ENDPOINT_NAME: "aico-iv-recs"
+  AWS_REGION: "us-east-1"
+  LOG_LEVEL: "info"
+  INVOKE_TIMEOUT_SECONDS: "10"

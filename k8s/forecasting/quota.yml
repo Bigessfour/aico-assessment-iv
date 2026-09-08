@@ -1,0 +1,41 @@
+# =============================================================================
+# ResourceQuota + LimitRange — guardrails for the forecasting namespace
+# =============================================================================
+# Talking points:
+#   - ResourceQuota: hard ceiling for the whole namespace (CPU, memory, pod count).
+#     Stops one team from consuming the entire shared class cluster.
+#   - LimitRange: default requests/limits + max per container if a Deployment
+#     forgets to set resources. Pairs with the Deployment's resources block.
+#   - Rubric: ResourceQuota and LimitRange per namespace.
+#   - Demo idea: raise replicas past quota → pods stay Pending (controlled failure).
+# =============================================================================
+apiVersion: v1
+kind: ResourceQuota
+metadata:
+  name: forecasting-quota
+  namespace: forecasting
+spec:
+  hard:
+    requests.cpu: "1"
+    requests.memory: 1Gi
+    limits.cpu: "2"
+    limits.memory: 2Gi
+    pods: "4"
+---
+apiVersion: v1
+kind: LimitRange
+metadata:
+  name: forecasting-limits
+  namespace: forecasting
+spec:
+  limits:
+    - type: Container
+      defaultRequest:
+        cpu: "100m"
+        memory: "128Mi"
+      default:
+        cpu: "250m"
+        memory: "256Mi"
+      max:
+        cpu: "500m"
+        memory: "512Mi"

@@ -1,0 +1,72 @@
+# =============================================================================
+# Deployment — desired state for the recommendations FastAPI pods
+# =============================================================================
+# Talking points:
+#   - replicas: how many pods; ReplicaSet keeps that count alive.
+#   - labels/selectors: Service finds pods with app=recommendations-api.
+#   - image: GHCR artifact we built; Always = re-pull :latest on restart.
+#   - envFrom: merges ConfigMap + Secret into container env (no hardcoding).
+#   - Probes (assessment rubric):
+#       startup  → /health  — don't kill us while bootstrapping
+#       readiness→ /ready   — no traffic until SageMaker config looks OK
+#       liveness → /health  — restart if the process is wedged
+#   - resources: requests (scheduler) + limits (cgroup cap) pair with LimitRange.
+#   - imagePullSecrets: lets the node authenticate to private ghcr.io images.
+# =============================================================================
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: recommendations-api
+  namespace: recommendations
+  labels:
+    app: recommendations-api
+    team: recommendations
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: recommendations-api
+  template:
+    metadata:
+      labels:
+        app: recommendations-api
+        team: recommendations
+    spec:
+      containers:
+        - name: recommendations-api
+          image: ghcr.io/bigessfour/recommendations:latest
+          imagePullPolicy: Always
+          ports:
+            - containerPort: 8000
+          envFrom:
+            - configMapRef:
+                name: recommendations-config
+            - secretRef:
+                name: recommendations-aws-creds
+          startupProbe:
+            httpGet:
+              path: /health
+              port: 8000
+            failureThreshold: 12
+            periodSeconds: 5
+          readinessProbe:
+            httpGet:
+              path: /ready
+              port: 8000
+            initialDelaySeconds: 5
+            periodSeconds: 10
+          livenessProbe:
+            httpGet:
+              path: /health
+              port: 8000
+            initialDelaySeconds: 15
+            periodSeconds: 20
+          resources:
+            requests:
+              memory: "128Mi"
+              cpu: "100m"
+            limits:
+              memory: "256Mi"
+              cpu: "250m"
+      imagePullSecrets:
+        - name: ghcr-secret
