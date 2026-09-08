@@ -1,0 +1,9 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: example-config
+  namespace: team-example
+data:
+  ENDPOINT_NAME: "your-sagemaker-endpoint-name"
+  AWS_REGION: "us-east-1"
+  LOG_LEVEL: "info"
