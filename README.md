@@ -5,6 +5,7 @@ Private working repo for Code Platoon Assessment IV.
 **Upstream brief:** [codeplatoon-devops/aico-assessment-iv](https://github.com/codeplatoon-devops/aico-assessment-iv)  
 **Full rubric / scenarios:** [docs/assessment-brief.md](docs/assessment-brief.md)  
 **Bootstrap guide:** [getting_started.md](getting_started.md)
+**Agent / stretch goals:** [agent.md](agent.md) — pursue all rubric bonuses
 
 ## Starter layout (from upstream `resources/`)
 
