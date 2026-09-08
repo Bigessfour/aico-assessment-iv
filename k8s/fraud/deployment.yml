@@ -1,3 +1,18 @@
+# =============================================================================
+# Deployment — desired state for the fraud FastAPI pods
+# =============================================================================
+# Talking points:
+#   - replicas: how many pods; ReplicaSet keeps that count alive.
+#   - labels/selectors: Service finds pods with app=fraud-api.
+#   - image: GHCR artifact we built; Always = re-pull :latest on restart.
+#   - envFrom: merges ConfigMap + Secret into container env (no hardcoding).
+#   - Probes (assessment rubric):
+#       startup  → /health  — don't kill us while bootstrapping
+#       readiness→ /ready   — no traffic until SageMaker config looks OK
+#       liveness → /health  — restart if the process is wedged
+#   - resources: requests (scheduler) + limits (cgroup cap) pair with LimitRange.
+#   - imagePullSecrets: lets the node authenticate to private ghcr.io images.
+# =============================================================================
 apiVersion: apps/v1
 kind: Deployment
 metadata:
@@ -28,21 +43,18 @@ spec:
                 name: fraud-config
             - secretRef:
                 name: fraud-aws-creds
-          # Startup: give the process time to boot before liveness kills it
           startupProbe:
             httpGet:
               path: /health
               port: 8000
             failureThreshold: 12
             periodSeconds: 5
-          # Readiness: only send traffic if /ready is 200
           readinessProbe:
             httpGet:
               path: /ready
               port: 8000
             initialDelaySeconds: 5
             periodSeconds: 10
-          # Liveness: restart the container if /health fails repeatedly
           livenessProbe:
             httpGet:
               path: /health

@@ -1,0 +1,35 @@
+# Lightweight PR checks — does NOT deploy to EKS.
+# Full build/push/apply lives in deploy.yml (still a template until Phase 4).
+name: CI
+
+on:
+  pull_request:
+    branches: [main]
+  push:
+    branches: [main]
+
+jobs:
+  validate:
+    name: Validate fraud service + manifests
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Syntax-check FastAPI app
+        run: python -m py_compile services/fraud-detection/app.py
+
+      - name: Confirm required k8s fraud manifests exist
+        run: |
+          set -e
+          for f in namespace configmap deployment service quota secret.example; do
+            test -f "k8s/fraud/${f}.yml"
+            echo "ok k8s/fraud/${f}.yml"
+          done
+
+      - name: Confirm History.md present
+        run: test -f History.md && head -n 5 History.md

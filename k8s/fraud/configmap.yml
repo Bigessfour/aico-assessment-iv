@@ -1,5 +1,12 @@
-# ConfigMap = non-secret config injected as env vars.
-# Endpoint name and region are not credentials — safe to commit.
+# =============================================================================
+# ConfigMap — non-secret configuration injected as environment variables
+# =============================================================================
+# Talking points:
+#   - Safe to commit: endpoint name, region, timeouts are not credentials.
+#   - Deployment uses envFrom.configMapRef → becomes process env in the pod.
+#   - ENDPOINT_NAME MUST be aico-iv-fraud for this team (routing isolation).
+#   - Change endpoint without rebuilding the image — just edit + kubectl apply.
+# =============================================================================
 apiVersion: v1
 kind: ConfigMap
 metadata:

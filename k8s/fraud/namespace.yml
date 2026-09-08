@@ -1,6 +1,11 @@
-# Namespace = hard isolation boundary on a shared cluster.
-# Fraud team's pods/services/quotas all live here so they cannot
-# accidentally collide with recommendations or forecasting names.
+# =============================================================================
+# Namespace — isolation boundary on the shared class EKS cluster
+# =============================================================================
+# Talking points:
+#   - Every fraud resource (pods, services, secrets, quotas) lives HERE.
+#   - Prevents name collisions with recommendations / forecasting teams.
+#   - Soft multi-tenancy: one cluster, many team namespaces.
+# =============================================================================
 apiVersion: v1
 kind: Namespace
 metadata:
