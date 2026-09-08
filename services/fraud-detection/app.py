@@ -1,9 +1,11 @@
 """Fraud Detection FastAPI wrapper around a SageMaker endpoint.
 
-Why this exists:
-  SageMaker endpoints are not a friendly HTTP API for other teams.
-  We wrap InvokeEndpoint in a small service with /health, /ready, /predict
-  so Kubernetes can probe us and callers get consistent JSON errors.
+Talking points (presentation):
+  - SageMaker InvokeEndpoint is AWS SDK only — not a friendly REST API.
+  - Platform eng wraps each team's endpoint in FastAPI so callers and
+    Kubernetes get the same contract: /health, /ready, /predict.
+  - This service is owned by the Fraud team; ENDPOINT_NAME must point at
+    aico-iv-fraud (not recs/forecast) so routing stays correct.
 """
 
 from fastapi import FastAPI, HTTPException
@@ -16,9 +18,15 @@ import json
 
 app = FastAPI(title="fraud-detection", version="0.1.0")
 
+# --- Config from environment (ConfigMap + Secret in Kubernetes) ---
+# ENDPOINT_NAME: which SageMaker endpoint to call (set per team).
+# AWS_REGION: must match where the endpoint lives (us-east-1 for class).
+# AWS_ACCESS_KEY_ID / AWS_SECRET_ACCESS_KEY: injected from a K8s Secret
+#   so the pod can call sagemaker:InvokeEndpoint (not in this file).
 ENDPOINT_NAME = os.getenv("ENDPOINT_NAME", "")
 AWS_REGION = os.getenv("AWS_REGION", "us-east-1")
-# Fail predict calls quickly instead of hanging forever (failure-path requirement)
+# Fail predict calls quickly instead of hanging forever (assessment
+# failure-path requirement: timeout / error propagation).
 INVOKE_TIMEOUT_SECONDS = int(os.getenv("INVOKE_TIMEOUT_SECONDS", "10"))
 
 _boto_config = Config(
@@ -29,6 +37,11 @@ _boto_config = Config(
 
 
 def get_sagemaker_client():
+    """Build a sagemaker-runtime client with our timeout/retry policy.
+
+    Uses the default boto3 credential chain (env vars in the pod,
+    or AWS_PROFILE / aws login locally).
+    """
     return boto3.client(
         "sagemaker-runtime",
         region_name=AWS_REGION,
@@ -38,7 +51,12 @@ def get_sagemaker_client():
 
 @app.get("/health")
 def health():
-    """Liveness: is the process up? Does not call SageMaker."""
+    """Liveness probe target.
+
+    Meaning: "is the Python process up?"
+    Does NOT call SageMaker — if the app is frozen but AWS is fine,
+    we still want kubelet to restart us. Keep this cheap and local.
+    """
     return {
         "status": "healthy",
         "service": "fraud-detection",
@@ -50,8 +68,11 @@ def health():
 
 @app.get("/ready")
 def ready():
-    """Readiness: can we construct a client and is ENDPOINT_NAME set?
-    Kubernetes uses this to decide whether to send traffic.
+    """Readiness probe target.
+
+    Meaning: "should Kubernetes send traffic to this pod?"
+    Returns 503 if ENDPOINT_NAME is missing or we cannot build a client
+    (e.g. bad/missing AWS creds). Service endpoints only include Ready pods.
     """
     if not ENDPOINT_NAME:
         return JSONResponse(
@@ -70,7 +91,12 @@ def ready():
 
 @app.post("/predict")
 def predict(payload: dict):
-    """Forward JSON body to the fraud SageMaker endpoint."""
+    """Business path: forward JSON to the fraud SageMaker endpoint.
+
+    Success → {"prediction": ...} tagged with service/endpoint for demos.
+    SageMaker/boto failures → HTTP 502 so callers know upstream failed
+    (not a bug in our routing).
+    """
     if not ENDPOINT_NAME:
         raise HTTPException(status_code=503, detail="ENDPOINT_NAME not set")
     try:
@@ -81,9 +107,13 @@ def predict(payload: dict):
             Body=json.dumps(payload),
         )
         result = json.loads(response["Body"].read().decode())
-        return {"service": "fraud-detection", "endpoint": ENDPOINT_NAME, "prediction": result}
+        return {
+            "service": "fraud-detection",
+            "endpoint": ENDPOINT_NAME,
+            "prediction": result,
+        }
     except (BotoCoreError, ClientError, TimeoutError) as e:
-        # Propagate as 502 so callers know upstream (SageMaker) failed
+        # 502 = bad gateway: we are up, but SageMaker (or network) failed
         raise HTTPException(status_code=502, detail=f"sagemaker invoke failed: {e}") from e
     except Exception as e:
         raise HTTPException(status_code=502, detail=str(e)) from e

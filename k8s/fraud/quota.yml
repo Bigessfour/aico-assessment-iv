@@ -1,4 +1,14 @@
-# ResourceQuota caps how much the fraud namespace can consume on the shared cluster.
+# =============================================================================
+# ResourceQuota + LimitRange — guardrails for the fraud namespace
+# =============================================================================
+# Talking points:
+#   - ResourceQuota: hard ceiling for the whole namespace (CPU, memory, pod count).
+#     Stops one team from consuming the entire shared class cluster.
+#   - LimitRange: default requests/limits + max per container if a Deployment
+#     forgets to set resources. Pairs with the Deployment's resources block.
+#   - Rubric: ResourceQuota and LimitRange per namespace.
+#   - Demo idea: raise replicas past quota → pods stay Pending (controlled failure).
+# =============================================================================
 apiVersion: v1
 kind: ResourceQuota
 metadata:
@@ -12,7 +22,6 @@ spec:
     limits.memory: 2Gi
     pods: "4"
 ---
-# LimitRange sets defaults/max for containers that omit resources.
 apiVersion: v1
 kind: LimitRange
 metadata:
