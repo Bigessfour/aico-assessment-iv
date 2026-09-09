@@ -148,9 +148,28 @@ Both new services used `--platform linux/amd64` from the start (lesson from frau
 
 ---
 
+## PR #2 merged (2026-09-08)
+
+Merged `feature/teams-recommendations-forecasting` to `main`. Revised `agent.md` to required-first order with honest baseline and shared-cluster guards.
+
+## Real `deploy.yml` (in progress)
+
+Replacing the upstream template with:
+
+- Matrix build/push for `fraud-detection`, `recommendations`, `forecasting` (`linux/amd64`)
+- `EKS_CLUSTER: k8s-training-cluster` (no placeholder)
+- Create AWS + GHCR secrets from Actions secrets (never apply `secret.example.yml`)
+- Apply ns/quota/configmap/deployment/service per team
+- Pin image to `${{ github.sha }}`
+- Verify rollout + `ENDPOINT_NAME` isolation + in-cluster `/health` + `/ready`
+
+Does **not** create or destroy the class EKS cluster.
+
 ## Still to do (platform)
 
+- Land real `deploy.yml` PR and confirm Actions green on `main`
+- Gateway + React ops dashboard (required UI + SageMaker gateway bonus)
 - Terraform lifecycle + optional remote state / k8s provider
-- GitHub Actions deploy workflow (build matrix, apply, verify)
-- React ops dashboard
-- Scenario 1 README + architecture diagram + teardown docs
+- Controlled failure demo script
+- Actions bonuses (rollback, branch targeting, lint/destroy-workloads)
+- Scenario 1 README + architecture diagram + teardown + presentation notes
