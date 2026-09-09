@@ -249,6 +249,10 @@ Addressed structural review findings:
 
 `kubectl apply --dry-run=client` failed on Actions (`localhost:8080`). Switched lint workflow to **kubeconform**.
 
+## Deploy verify fix (2026-09-08)
+
+PR #10 deploy failed: `verify.sh` forced `AWS_PROFILE=codeplatoon` on Actions (no such profile). Fixed in PR #13 — only default that profile when `AWS_ACCESS_KEY_ID` is unset. Redeploy [run](https://github.com/Bigessfour/aico-assessment-iv/actions/runs/34297310143) → VERIFY OK.
+
 ## Still to do (platform)
 
 
