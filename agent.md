@@ -11,7 +11,7 @@ Ship a **demoable internal ML platform** that a grader can reproduce from the RE
 
 Score the **required rubric first**. Bonuses are stretch after the required vertical is green. A late or incomplete required slice costs more than a missing bonus.
 
-**Current risk is shrinking:** README matches the live platform (PR #6). Land Terraform on `main`, then failure-demo + Actions bonuses.
+**Current risk is shrinking:** README + Terraform are on `main`. Controlled-failure bonus is scripted. Next: Actions bonuses + speaker notes.
 
 Scenario (locked): **Scenario 1 — ML Platform**  
 Teams / SageMaker endpoints:
@@ -49,10 +49,10 @@ Latest **CI** and **Build and Deploy** on `main` succeeded ([deploy run](https:/
 
 | Slice | Status | Notes |
 |-------|--------|-------|
-| Controlled failure demo | **Not started** | K8s bonus |
+| Controlled failure demo | **This PR** | `scripts/demo-failure.sh` + `verify.sh`; History evidence; always restore |
 | Actions bonuses | **Thin** | No rollback, no `workflow_run` chain, no lint/destroy-workloads. `workflow_dispatch` `teams` input is a start |
 | Presentation notes | **Missing** | `docs/presentation-notes.md` |
-| Leftover remote branches | Cleanup | Delete merged feature branches after PR #5 lands |
+| Leftover remote branches | Cleanup | Delete merged feature branch leftovers |
 
 ### What is actually on `main` (plus this PR for terraform/)
 
@@ -145,15 +145,13 @@ If you presented tomorrow as-is: live platform + README carry **K8s / SageMaker 
 - [x] Real `deploy.yml` green on `main`
 - [x] Gateway + ops dashboard on `main`
 - [x] **Rewrite README** (scenario, mermaid, setup, deploy, verify, teardown) — merged via PR #6
-- [x] Terraform lifecycle for namespaces/ConfigMaps/RBAC + remote state (this PR #5)
+- [x] Terraform lifecycle for namespaces/ConfigMaps/RBAC + remote state (merged PR #5)
 - [x] Architecture diagram + teardown in README (mermaid + teardown section)
 - [ ] `docs/presentation-notes.md`
 
 ### Bonuses still open
 
-- [ ] `scripts/demo-failure.sh` + restore + History.md capture
 - [ ] Actions: rollback (`workflow_dispatch`), `workflow_run` chain, lint dry-run, namespaced destroy
-- [ ] Helper scripts: `scripts/verify.sh` (bootstrap-tf exists on this branch)
 
 ### Bonuses done (say accurately)
 
@@ -161,6 +159,7 @@ If you presented tomorrow as-is: live platform + README carry **K8s / SageMaker 
 - [x] A/B **label** via `WEIGHT_A` (not dual SageMaker endpoints)
 - [x] React ops UI + Tailwind styling + live poll + version + test-predict
 - [x] Terraform remote state S3 + DynamoDB lock + K8s provider (ns/ConfigMaps/RBAC)
+- [x] `scripts/verify.sh` + `scripts/demo-failure.sh` (quota + ready) with History.md evidence + restore
 
 ---
 
