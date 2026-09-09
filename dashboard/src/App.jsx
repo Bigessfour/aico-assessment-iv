@@ -3,8 +3,9 @@
  *
  * Rubric features covered:
  *   1) Live polling (every POLL_MS) of gateway aggregate /health
- *   2) Version display per team
- *   3) Test-request form → POST /predict/{team} via gateway (proves routing)
+ *   2) Version display per team (service version + deployed model version)
+ *   3) Request counts per team and per A/B variant
+ *   4) Test-request form → POST /predict/{team} via gateway (proves routing)
  *
  * API base:
  *   - In-cluster (nginx): /api  → proxied to gateway-api.platform.svc
@@ -81,6 +82,8 @@ function App() {
   }
 
   const teams = health?.teams || {};
+  const requests = health?.requests || {};
+  const variantCounts = requests.by_variant || {};
 
   return (
     <div className="min-h-screen bg-gradient-to-b from-slate-950 via-slate-900 to-slate-950">
@@ -100,7 +103,10 @@ function App() {
           </div>
           <div className="text-right text-xs text-slate-400 font-mono">
             <div>gateway v{health?.version || "—"}</div>
-            <div>A/B weight_a={health?.weight_a ?? "—"}</div>
+            <div>
+              A/B {health?.variants?.a || "a"} {health?.weight_a ?? "—"}% /{" "}
+              {health?.variants?.b || "b"} {health ? 100 - health.weight_a : "—"}%
+            </div>
             <div>last check {lastCheck || "—"}</div>
           </div>
         </div>
@@ -113,6 +119,35 @@ function App() {
           </div>
         )}
 
+        {/* Traffic counters — request volume and how the A/B split landed */}
+        <section className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+          <div className="rounded-xl border border-slate-800 bg-slate-900/60 p-5">
+            <p className="text-xs uppercase tracking-wide text-slate-400">Requests routed</p>
+            <p className="mt-2 font-mono text-3xl text-teal-300">{requests.total ?? 0}</p>
+          </div>
+          <div className="rounded-xl border border-slate-800 bg-slate-900/60 p-5">
+            <p className="text-xs uppercase tracking-wide text-slate-400">Failed</p>
+            <p
+              className={`mt-2 font-mono text-3xl ${
+                requests.errors ? "text-rose-300" : "text-slate-300"
+              }`}
+            >
+              {requests.errors ?? 0}
+            </p>
+          </div>
+          {Object.entries(variantCounts).map(([variant, count]) => (
+            <div
+              key={variant}
+              className="rounded-xl border border-slate-800 bg-slate-900/60 p-5"
+            >
+              <p className="text-xs uppercase tracking-wide text-slate-400">
+                variant {variant}
+              </p>
+              <p className="mt-2 font-mono text-3xl text-slate-200">{count}</p>
+            </div>
+          ))}
+        </section>
+
         {/* Multi-team health table — owner + version + green/red */}
         <section>
           <h2 className="mb-4 text-lg font-semibold text-slate-100">Team services</h2>
@@ -123,7 +158,9 @@ function App() {
                   <th className="px-4 py-3">Team</th>
                   <th className="px-4 py-3">Owner</th>
                   <th className="px-4 py-3">Status</th>
-                  <th className="px-4 py-3">Version</th>
+                  <th className="px-4 py-3">Service</th>
+                  <th className="px-4 py-3">Model version</th>
+                  <th className="px-4 py-3">Requests</th>
                   <th className="px-4 py-3">SageMaker endpoint</th>
                 </tr>
               </thead>
@@ -148,6 +185,12 @@ function App() {
                       </td>
                       <td className="px-4 py-3 font-mono text-slate-300">
                         {row.version || "—"}
+                      </td>
+                      <td className="px-4 py-3 font-mono text-slate-300">
+                        {row.model_version || "—"}
+                      </td>
+                      <td className="px-4 py-3 font-mono text-slate-300">
+                        {row.requests ?? 0}
                       </td>
                       <td className="px-4 py-3 font-mono text-slate-400">
                         {row.endpoint || "—"}

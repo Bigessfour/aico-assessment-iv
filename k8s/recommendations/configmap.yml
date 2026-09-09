@@ -17,3 +17,5 @@ data:
   AWS_REGION: "us-east-1"
   LOG_LEVEL: "info"
   INVOKE_TIMEOUT_SECONDS: "10"
+  # Model version shown on the dashboard — bump here, no image rebuild.
+  MODEL_VERSION: "recs-factorization-2026.09.1"

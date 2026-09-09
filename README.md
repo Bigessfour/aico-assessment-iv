@@ -66,7 +66,7 @@ flowchart TB
 | `platform` | `gateway-api` | `ghcr.io/bigessfour/gateway` | — (proxies teams) |
 | `platform` | `ops-dashboard` | `ghcr.io/bigessfour/ops-dashboard` | — (UI) |
 
-Each team FastAPI exposes `/health`, `/ready`, `/predict`. Gateway exposes aggregate `/health` and `POST /predict/{team}`. A/B is a **ConfigMap weight label** (`WEIGHT_A`), not two SageMaker model variants.
+Each team FastAPI exposes `/health`, `/ready`, `/predict`. Gateway exposes aggregate `/health`, `GET /stats`, and `POST /predict/{team}`. `WEIGHT_A` splits traffic between two variant labels (`baseline` / `candidate`) at the gateway, which forwards the choice downstream as `X-Model-Variant` and counts requests per team and per variant. Both variants currently reach the same SageMaker endpoint — the split is platform-side, not two SageMaker production variants.
 
 ---
 
@@ -83,13 +83,15 @@ k8s/
   fraud|recommendations|forecasting/   # ns, ConfigMap, Deployment, Service, quota
   platform/             # gateway + dashboard
 .github/workflows/
-  ci.yml                # PR/main: Python syntax + manifest presence
+  ci.yml                # PR/main: syntax, manifests, pytest, dashboard build
   deploy.yml            # matrix build → GHCR → EKS apply → verify (+ git_ref)
+  terraform.yml         # PR plan; dispatch plan/apply/destroy (gated)
   lint-manifests.yml    # kubeconform offline
   rollback.yml          # rollout undo
   destroy-workloads.yml # our namespaces only
   chain-after-deploy.yml # after Build and Deploy → verify.sh
-terraform/              # namespaces + platform RBAC + remote state (not ConfigMaps)
+terraform/              # SSM catalog, log group, namespaces, RBAC, remote state
+tests/                  # pytest contract tests for the four FastAPI services
 scripts/                # verify.sh, demo-failure.sh, bootstrap-tf-backend.sh
 History.md              # issues hit + fixes
 getting_started.md      # original upstream bootstrap notes
@@ -135,8 +137,11 @@ The workflow:
 |----------|---------|
 | **Chain after deploy** | After **Build and Deploy** succeeds, runs `scripts/verify.sh` again |
 | **Lint manifests** | `kubeconform` offline schema check on PRs touching `k8s/` |
+| **Terraform** | `fmt` + `validate` + `plan` on PRs; dispatch for `apply` / `destroy` |
 | **Rollback** | `rollout undo` for teams / platform (optional revision) |
 | **Destroy workloads** | Deletes only our four namespaces after confirm `destroy-my-workloads` |
+
+CI itself runs three jobs on every PR: manifest/syntax validation, `pytest tests`, and a production build of the dashboard.
 
 Never use Destroy against the shared EKS cluster itself.
 
@@ -176,6 +181,9 @@ kubectl -n forecasting exec deploy/forecasting-api -- \
 kubectl -n platform port-forward svc/gateway-api 18080:80
 curl -s http://127.0.0.1:18080/health | python3 -m json.tool
 curl -s http://127.0.0.1:18080/ready
+
+# A/B split + request counters
+curl -s http://127.0.0.1:18080/stats | python3 -m json.tool
 ```
 
 ### Ops dashboard
@@ -185,7 +193,7 @@ kubectl -n platform port-forward svc/ops-dashboard 3000:80
 # open http://localhost:3000
 ```
 
-The UI live-polls gateway `/health` (via nginx `/api`), shows owner/version/endpoint, and can `POST /predict/{team}` to prove routing.
+The UI live-polls gateway `/health` (via nginx `/api`) and shows, per team, the owner, service version, deployed `MODEL_VERSION`, request count, and SageMaker endpoint. Counter cards across the top show total routed requests, failures, and how traffic landed across the `baseline` / `candidate` variants. The test-request form does `POST /predict/{team}` to prove routing isolation.
 
 ---
 
@@ -193,7 +201,7 @@ The UI live-polls gateway `/health` (via nginx `/api`), shows owner/version/endp
 
 ```bash
 export AWS_PROFILE=codeplatoon
-./scripts/verify.sh                 # Deployments, ENDPOINT_NAME isolation, in-cluster /health+/ready
+./scripts/verify.sh                 # Deployments, ENDPOINT_NAME isolation, SSM drift, in-cluster /health+/ready
 ./scripts/demo-failure.sh quota     # ResourceQuota rejects 5th fraud pod; always restores
 ./scripts/demo-failure.sh ready     # empty ENDPOINT_NAME → Ready=False + /ready 503; always restores
 ```
@@ -202,9 +210,20 @@ Both demos use an EXIT trap to restore replicas and `ENDPOINT_NAME`. Evidence: [
 
 ---
 
+## Tests
+
+```bash
+pip install -r tests/requirements.txt
+pytest tests -q      # 18 contract tests: probes, routing isolation, A/B, 502/504 paths
+```
+
+Same job runs on every pull request. The tests load each `services/*/app.py` under a unique alias with stubbed SageMaker and httpx clients, so nothing touches AWS.
+
+---
+
 ## Terraform
 
-**Do not** `terraform destroy` the class EKS cluster. This stack only manages **our** namespaces and platform RBAC, plus remote state (S3 + DynamoDB). ConfigMaps are Actions/YAML-owned. The cluster is a data source only.
+**Do not** `terraform destroy` the class EKS cluster — it is a data source here. This stack provisions the SSM endpoint catalog (`/ml-platform/dev/<team>/…`), the platform CloudWatch log group, our four namespaces, platform RBAC, the Terraform-owned `platform-metadata` ConfigMap, and its own remote state in S3 + DynamoDB. App ConfigMaps stay Actions/YAML-owned.
 
 ```bash
 export AWS_PROFILE=codeplatoon
@@ -216,7 +235,9 @@ terraform apply
 terraform destroy   # ONLY resources in this state
 ```
 
-Details and import notes: [terraform/README.md](terraform/README.md). Terraform owns **namespaces + platform RBAC** only; ConfigMaps are applied by Actions/YAML (single writer).
+Or run it from CI: **Actions → Terraform → Run workflow** (`plan` / `apply` / `destroy`; destroy needs the confirm phrase `destroy-my-infra`). PRs touching `terraform/` get an automatic plan.
+
+Details and import notes: [terraform/README.md](terraform/README.md). Parameter Store is the authoritative endpoint catalog, and `scripts/verify.sh` fails if a namespace ConfigMap has drifted from it.
 
 ---
 
@@ -257,7 +278,8 @@ If `/ready` fails with a CRT / login-credential message after `aws login`, prefe
 
 Full speaker track: [docs/presentation-notes.md](docs/presentation-notes.md).
 
-- **A/B:** gateway ConfigMap `WEIGHT_A` labels responses with `variant` A/B. It does **not** deploy two SageMaker model versions.
+- **A/B:** gateway `WEIGHT_A` splits traffic between `baseline` and `candidate`, forwards `X-Model-Variant`, and counts the split on `/stats`. Both labels still reach one SageMaker production variant — say this before a grader asks.
+- **Model versions:** `MODEL_VERSION` per team ConfigMap; change it and re-apply, no image rebuild.
 - **Images:** always build `--platform linux/amd64` from Apple Silicon.
 - **Auth for long sessions:** use `AWS_PROFILE=codeplatoon`; `aws login` sessions expire mid-deploy.
 - Failures and fixes for the write-up: [History.md](History.md).

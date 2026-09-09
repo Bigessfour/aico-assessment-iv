@@ -1,0 +1,5 @@
+# Test-only dependencies. Runtime deps come from each services/*/requirements.txt.
+pytest
+fastapi
+httpx
+boto3

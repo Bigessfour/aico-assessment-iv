@@ -3,8 +3,9 @@
 # =============================================================================
 # Talking points:
 #   - Does NOT create/destroy the class EKS cluster (data-source only).
-#   - Owns namespaces + ConfigMaps (+ platform read Role) via Kubernetes provider.
-#   - Deployments/Services stay as kubectl YAML so we do not fight two owners.
+#   - Owns the SSM endpoint catalog + platform CloudWatch log group in AWS.
+#   - Owns namespaces, platform read Role, and the platform-metadata ConfigMap.
+#   - Deployments/Services/app ConfigMaps stay kubectl YAML — one owner each.
 #   - Remote state: S3 + DynamoDB (see backend.tf + scripts/bootstrap-tf-backend.sh)
 #
 # Lifecycle:

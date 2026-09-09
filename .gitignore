@@ -9,8 +9,12 @@ terraform/tfplan
 # Keep .terraform.lock.hcl committed for reproducible provider versions
 __pycache__/
 *.pyc
+.pytest_cache/
 .venv/
 venv/
+# Editor / agent tooling scratch — machine-local, never committed
+.cursor/
+.trunk/
 # Never commit real k8s secrets (use secret.example.yml as the template only)
 k8s/**/secret.yml
 k8s/**/secret.yaml

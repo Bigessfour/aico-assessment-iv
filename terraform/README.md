@@ -4,12 +4,19 @@
 
 | Owns (Terraform) | Does NOT own |
 |------------------|--------------|
-| Namespaces: `fraud`, `recommendations`, `forecasting`, `platform` | Class EKS cluster `k8s-training-cluster` |
-| Platform `Role` / `RoleBinding` (read-only) | ConfigMaps (YAML + Actions — single writer) |
-| Remote state in S3 + DynamoDB lock | Deployments / Services / Secrets / ResourceQuotas |
-| | Other students' namespaces / VPC / node groups |
+| SSM parameters: `/ml-platform/dev/<team>/{endpoint_name,owner}` | Class EKS cluster `k8s-training-cluster` |
+| CloudWatch log group `/ml-platform/dev/platform` | App ConfigMaps (YAML + Actions — single writer) |
+| Namespaces: `fraud`, `recommendations`, `forecasting`, `platform` | Deployments / Services / Secrets / ResourceQuotas |
+| Platform `Role` / `RoleBinding` (read-only) | SageMaker endpoints and models |
+| ConfigMap `platform/platform-metadata` (infra facts) | Other students' namespaces / VPC / node groups |
+| Remote state in S3 + DynamoDB lock | |
 
-ConfigMaps (`ENDPOINT_NAME`, `WEIGHT_A`) are applied from `k8s/*/configmap.yml` so deploy and `demo-failure.sh` do not fight Terraform.
+Two kinds of ConfigMap, one writer each:
+
+- **App config** (`ENDPOINT_NAME`, `MODEL_VERSION`, `WEIGHT_A`) comes from `k8s/*/configmap.yml`, applied by Actions and edited by `demo-failure.sh`. Terraform never touches it.
+- **`platform-metadata`** carries facts only Terraform knows — cluster name, SSM prefix, log group, endpoint catalog. No workflow applies it.
+
+Parameter Store is the authoritative endpoint catalog. `scripts/verify.sh` diffs each namespace's live ConfigMap against it and fails on drift (and skips quietly if the parameters are not readable).
 
 ## Prerequisites
 
@@ -29,6 +36,8 @@ terraform plan
 terraform apply
 terraform destroy   # ONLY resources in this state — never the class cluster
 ```
+
+Or run it from CI: **Actions → Terraform → Run workflow** with `action = plan | apply | destroy`. Pull requests that touch `terraform/` get an automatic `fmt`, `validate`, and `plan`. Destroy additionally requires typing `destroy-my-infra`.
 
 ## Import existing namespaces (first apply after kubectl created them)
 

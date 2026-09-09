@@ -3,7 +3,8 @@
 # =============================================================================
 # Talking points:
 #   - FRAUD_URL etc. use in-cluster DNS (no hardcoded pod IPs).
-#   - WEIGHT_A implements the A/B bonus without new SageMaker endpoints.
+#   - WEIGHT_A splits traffic between the two variant labels below. Both hit the
+#     same SageMaker endpoint today; the split and its counters are gateway-side.
 #   - Change weight → kubectl apply → rollout restart deployment/gateway-api.
 # =============================================================================
 apiVersion: v1
@@ -16,5 +17,7 @@ data:
   RECOMMENDATIONS_URL: "http://recommendations-api.recommendations.svc.cluster.local"
   FORECASTING_URL: "http://forecasting-api.forecasting.svc.cluster.local"
   WEIGHT_A: "80"
+  VARIANT_A_LABEL: "baseline"
+  VARIANT_B_LABEL: "candidate"
   HTTP_TIMEOUT_SECONDS: "15"
   CORS_ORIGINS: "*"

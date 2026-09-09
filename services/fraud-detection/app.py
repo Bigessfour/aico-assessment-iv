@@ -8,7 +8,9 @@ Talking points (presentation):
     aico-iv-fraud (not recs/forecast) so routing stays correct.
 """
 
-from fastapi import FastAPI, HTTPException
+from typing import Optional
+
+from fastapi import FastAPI, Header, HTTPException
 from fastapi.responses import JSONResponse
 from botocore.config import Config
 from botocore.exceptions import BotoCoreError, ClientError
@@ -28,6 +30,9 @@ AWS_REGION = os.getenv("AWS_REGION", "us-east-1")
 # Fail predict calls quickly instead of hanging forever (assessment
 # failure-path requirement: timeout / error propagation).
 INVOKE_TIMEOUT_SECONDS = int(os.getenv("INVOKE_TIMEOUT_SECONDS", "10"))
+# MODEL_VERSION: which trained model this endpoint is serving. Lives in the
+# ConfigMap so the dashboard shows a real version without an image rebuild.
+MODEL_VERSION = os.getenv("MODEL_VERSION", "unversioned")
 
 _boto_config = Config(
     connect_timeout=INVOKE_TIMEOUT_SECONDS,
@@ -63,6 +68,7 @@ def health():
         "team": "fraud",
         "endpoint": ENDPOINT_NAME,
         "version": app.version,
+        "model_version": MODEL_VERSION,
     }
 
 
@@ -90,12 +96,14 @@ def ready():
 
 
 @app.post("/predict")
-def predict(payload: dict):
+def predict(payload: dict, x_model_variant: Optional[str] = Header(default=None)):
     """Business path: forward JSON to the fraud SageMaker endpoint.
 
     Success → {"prediction": ...} tagged with service/endpoint for demos.
     SageMaker/boto failures → HTTP 502 so callers know upstream failed
     (not a bug in our routing).
+    X-Model-Variant is set by the gateway's A/B split and echoed back so a
+    caller can see which variant served the request.
     """
     if not ENDPOINT_NAME:
         raise HTTPException(status_code=503, detail="ENDPOINT_NAME not set")
@@ -110,6 +118,8 @@ def predict(payload: dict):
         return {
             "service": "fraud-detection",
             "endpoint": ENDPOINT_NAME,
+            "model_version": MODEL_VERSION,
+            "served_variant": x_model_variant or "direct",
             "prediction": result,
         }
     except (BotoCoreError, ClientError, TimeoutError) as e:
