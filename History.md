@@ -279,7 +279,20 @@ Re-pulled the upstream brief (`codeplatoon-devops/aico-assessment-iv`) — byte-
 - `Build and Deploy` → [run](https://github.com/Bigessfour/aico-assessment-iv/actions/runs/34408887075): VERIFY OK, including the new drift check (`OK fraud → aico-iv-fraud matches /ml-platform/dev/fraud/endpoint_name`, same for recs and forecast) and gateway `0.2.0` reporting `variants {a: baseline, b: candidate}` with the counter block
 - Each team `/health` now carries its `model_version` (`fraud-xgboost-2026.09.1`, `recs-factorization-2026.09.1`, `forecast-deepar-2026.09.1`)
 
+## Comment pass and a Docker bug found while writing it up (2026-09-09)
+
+Building a study guide for the presentation meant re-reading every file as a grader would, which surfaced three things worth recording.
+
+**Two manifests had been left behind.** Every team manifest carried a talking-points header, but `k8s/platform/deployment-gateway.yml` and `service-gateway.yml` had a single title line each — they were written early and never revisited. PR [#17](https://github.com/Bigessfour/aico-assessment-iv/pull/17) brought them up to the same standard: why the gateway lives in `platform` rather than a team namespace, why it carries no AWS Secret, why all three of its probes target `/ready` while the team pods use `/health` for liveness, and ClusterIP vs LoadBalancer on a shared cluster. Same pass documented the ReplicaSet history that makes `rollout undo` a seconds-long operation, and why `chain-after-deploy` checks out the deployed SHA instead of current `main`.
+
+**A stale filename in a comment.** `deploy.yml`'s header pointed at `chain-after-ci.yml`, which stopped existing in `c97f00a` when the workflow was renamed to `chain-after-deploy.yml`. The code was right; the comment had rotted. Fixed in the same PR. Related artifact a grader will see: the Actions tab still lists retired **"Chain after CI"** runs from `00:43`–`00:53` on 2026-09-08 with `failure` and `skipped` results. Those are from the old name and cannot run again — the file is gone. Leaving them rather than deleting the run history, because the failures are real and the fix is documented above.
+
+**A real bug: no `.dockerignore` anywhere.** `dashboard/Dockerfile` runs `npm ci` inside the image and then `COPY . ./`, so a local `docker build` on this Mac copies the host's arm64 `node_modules` on top of the Linux ones just installed, breaking anything with a compiled binary. CI never reproduced it because a fresh checkout has no `node_modules` — it would only ever have bitten during a laptop demo. PR [#18](https://github.com/Bigessfour/aico-assessment-iv/pull/18) added `.dockerignore` to the dashboard and all four services. Worth saying out loud: this was found by reading, not by failing.
+
+### Repo state after #18
+
+`main` is the only branch, locally and on GitHub; all 18 PRs merged, none open. Latest run of every workflow on `main` is green — Build and Deploy, CI, Chain after deploy, Terraform — so the live cluster was re-verified against current `main`.
+
 ## Still to do (platform)
 
 - Presentation rehearsal and slide/demo track
-- Optional leftover remote branch cleanup
