@@ -231,6 +231,10 @@ Lesson: a wrong-but-nonempty `ENDPOINT_NAME` still passes `/ready` (client const
 - `chain-after-ci.yml` — `workflow_run` after successful CI push to `main` runs `scripts/verify.sh`
 - `deploy.yml` — `git_ref` input for branch/SHA targeting on manual runs
 
+## Presentation notes (2026-09-08)
+
+Added `docs/presentation-notes.md` — demo order, Q&A honesty on A/B, rubric map.
+
 ## Still to do (platform)
 
-- Presentation notes + leftover branch cleanup
+- Optional leftover remote branch cleanup

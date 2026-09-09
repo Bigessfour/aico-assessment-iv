@@ -255,6 +255,8 @@ If `/ready` fails with a CRT / login-credential message after `aws login`, prefe
 
 ## Presentation notes
 
+Full speaker track: [docs/presentation-notes.md](docs/presentation-notes.md).
+
 - **A/B:** gateway ConfigMap `WEIGHT_A` labels responses with `variant` A/B. It does **not** deploy two SageMaker model versions.
 - **Images:** always build `--platform linux/amd64` from Apple Silicon.
 - **Auth for long sessions:** use `AWS_PROFILE=codeplatoon`; `aws login` sessions expire mid-deploy.
