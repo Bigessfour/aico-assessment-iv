@@ -1,4 +1,4 @@
-# Runtime dependencies for the fraud FastAPI wrapper.
+# Runtime dependencies for the forecasting FastAPI wrapper.
 # fastapi/uvicorn = HTTP API; boto3 = SageMaker InvokeEndpoint client.
 fastapi
 uvicorn

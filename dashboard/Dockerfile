@@ -8,7 +8,8 @@ FROM node:18-alpine AS build
 WORKDIR /app
 
 COPY package*.json ./
-RUN npm install --silent
+# Lockfile is committed, so builds are reproducible.
+RUN npm ci --silent
 
 COPY . ./
 # Bake relative /api so nginx can proxy to the gateway in-cluster

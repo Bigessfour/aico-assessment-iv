@@ -2,11 +2,12 @@
 # Kubernetes objects managed by Terraform (bonus: Kubernetes provider)
 # =============================================================================
 # Ownership boundary (single owner — no dual-write):
-#   Terraform → Namespace, platform Role/RoleBinding
-#   kubectl YAML / Actions → ConfigMaps, Deployments, Services, Secrets, quotas
+#   Terraform → Namespace, platform Role/RoleBinding, platform-metadata ConfigMap
+#   kubectl YAML / Actions → app ConfigMaps, Deployments, Services, Secrets, quotas
 #
-# ConfigMaps (ENDPOINT_NAME, WEIGHT_A) live in k8s/*/configmap.yml so deploy and
-# demo-failure.sh are the only writers. Do not re-add kubernetes_config_map here.
+# App ConfigMaps (ENDPOINT_NAME, WEIGHT_A) live in k8s/*/configmap.yml so deploy
+# and demo-failure.sh are their only writers. platform-metadata is different: it
+# carries infrastructure facts only Terraform knows, and no workflow applies it.
 #
 # If namespaces already exist from earlier kubectl apply, import them once:
 #   terraform import 'kubernetes_namespace.team["fraud"]' fraud
@@ -59,6 +60,27 @@ resource "kubernetes_role" "platform_read" {
     api_groups = ["apps"]
     resources  = ["deployments"]
     verbs      = ["get", "list", "watch"]
+  }
+}
+
+# --- Infrastructure facts published into the cluster (Terraform is sole writer) ---
+resource "kubernetes_config_map" "platform_metadata" {
+  metadata {
+    name      = "platform-metadata"
+    namespace = kubernetes_namespace.platform.metadata[0].name
+    labels = {
+      "app.kubernetes.io/part-of"    = "ml-platform"
+      "app.kubernetes.io/managed-by" = "terraform"
+    }
+  }
+
+  data = {
+    CLUSTER_NAME       = data.aws_eks_cluster.class.name
+    AWS_REGION         = var.aws_region
+    ENVIRONMENT        = var.environment
+    SSM_PREFIX         = local.ssm_prefix
+    PLATFORM_LOG_GROUP = aws_cloudwatch_log_group.platform.name
+    ENDPOINT_CATALOG   = jsonencode({ for k, v in var.teams : k => v.endpoint })
   }
 }
 

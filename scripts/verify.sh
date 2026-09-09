@@ -104,6 +104,28 @@ for team in "${TEAMS_ARR[@]}"; do
 done
 
 echo
+echo "== ConfigMap vs Terraform SSM catalog =="
+# Terraform owns the authoritative endpoint names in Parameter Store. A mismatch
+# means cluster reality drifted from IaC. Missing/unreadable params are a SKIP,
+# not a failure, so this check never blocks a deploy on IAM scope.
+SSM_PREFIX="${SSM_PREFIX:-/ml-platform/dev}"
+for team in "${TEAMS_ARR[@]}"; do
+  param="${SSM_PREFIX}/${team}/endpoint_name"
+  if ssm_val="$(aws ssm get-parameter --name "$param" --region "${AWS_REGION:-us-east-1}" \
+      --query 'Parameter.Value' --output text 2>/dev/null)"; then
+    cm_val="$(kubectl -n "$team" get configmap "${team}-config" -o jsonpath='{.data.ENDPOINT_NAME}')"
+    if [[ "$ssm_val" == "$cm_val" ]]; then
+      echo "OK   $team → $cm_val matches $param"
+    else
+      echo "FAIL $team → ConfigMap='$cm_val' SSM='$ssm_val' ($param)"
+      fail=1
+    fi
+  else
+    echo "SKIP $team → $param unreadable (terraform apply not run, or no ssm:GetParameter)"
+  fi
+done
+
+echo
 echo "== in-cluster /health + /ready =="
 for team in "${TEAMS_ARR[@]}"; do
   echo "--- $team ---"

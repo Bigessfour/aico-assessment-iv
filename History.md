@@ -253,7 +253,26 @@ Addressed structural review findings:
 
 PR #10 deploy failed: `verify.sh` forced `AWS_PROFILE=codeplatoon` on Actions (no such profile). Fixed in PR #13 — only default that profile when `AWS_ACCESS_KEY_ID` is unset. Redeploy [run](https://github.com/Bigessfour/aico-assessment-iv/actions/runs/34297310143) → VERIFY OK.
 
+## Bonus sweep against the upstream rubric (2026-09-09)
+
+Re-pulled the upstream brief (`codeplatoon-devops/aico-assessment-iv`) — byte-identical to our `docs/assessment-brief.md`, so the rubric had not moved. Audit found one real hole and three thin bonuses.
+
+**Hole: Terraform provisioned zero AWS resources.** The stack only had two `data "aws_*"` sources plus Kubernetes-provider objects, and Kubernetes-provider resources are *bonus* 1.5 — not the base "provision cloud resources through Terraform" requirement. Added `terraform/aws.tf`:
+
+- `aws_ssm_parameter` per team for `endpoint_name` and `owner` under `/ml-platform/dev/` — Parameter Store is now the authoritative endpoint catalog
+- `aws_cloudwatch_log_group /ml-platform/dev/platform`
+- Terraform-owned `platform-metadata` ConfigMap (cluster name, SSM prefix, log group, endpoint catalog). Distinct from the app ConfigMaps, so still one writer each — this also reclaims the "ConfigMaps via Kubernetes provider" wording in bonus 1.5 without reintroducing dual ownership
+- `scripts/verify.sh` now diffs each namespace ConfigMap against SSM and fails on drift; unreadable parameters are a SKIP so IAM scope cannot break a deploy
+
+**A/B was label-only.** Gateway now does a weighted split between `baseline` and `candidate`, forwards the choice as `X-Model-Variant`, and the team services echo `served_variant` plus a `MODEL_VERSION` that comes from their ConfigMap. Still one SageMaker production variant behind both labels — documented rather than hidden.
+
+**Dashboard had 3 of 4 optional features.** Added request counts: gateway keeps per-team and per-variant counters, exposes `GET /stats`, and folds a snapshot into `/health`. Dashboard shows counter cards plus model version and per-team request columns.
+
+**"Run tests" bonus had no tests.** Added `tests/` — 18 pytest contract tests covering the probe contract, routing isolation, the 502 SageMaker failure path, the 504 timeout path, variant forwarding, and counter accuracy. Each service loads under a unique module alias because all four files are named `app.py`. CI gained a `pytest` job and a real dashboard `npm ci && npm run build` job; committed `package-lock.json` so both CI and the image build are reproducible.
+
+**"Destroy infra" bonus covered workloads only.** Added `terraform.yml`: `fmt` + `validate` + `plan` on PRs touching `terraform/`, and a dispatch with `plan` / `apply` / `destroy`, where destroy requires typing `destroy-my-infra`.
+
 ## Still to do (platform)
 
-
+- Presentation rehearsal and slide/demo track
 - Optional leftover remote branch cleanup

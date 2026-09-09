@@ -33,7 +33,22 @@ output "team_endpoints" {
   value       = { for k, v in var.teams : k => v.endpoint }
 }
 
+output "ssm_endpoint_parameters" {
+  description = "Parameter Store names holding the authoritative endpoint catalog."
+  value       = { for k, p in aws_ssm_parameter.team_endpoint : k => p.name }
+}
+
+output "platform_log_group" {
+  description = "CloudWatch log group created for platform-level logs."
+  value       = aws_cloudwatch_log_group.platform.name
+}
+
+output "platform_metadata_configmap" {
+  description = "Terraform-owned ConfigMap publishing infra facts into the cluster."
+  value       = "${kubernetes_config_map.platform_metadata.metadata[0].namespace}/${kubernetes_config_map.platform_metadata.metadata[0].name}"
+}
+
 output "teardown_note" {
   description = "Reminder for destroy scope."
-  value       = "terraform destroy removes ONLY namespaces/RBAC in this state — never the class EKS cluster. ConfigMaps/Deployments are Actions/YAML-owned."
+  value       = "terraform destroy removes ONLY this state: SSM parameters, the platform log group, namespaces, platform RBAC, and platform-metadata. Never the class EKS cluster. App ConfigMaps/Deployments are Actions/YAML-owned."
 }

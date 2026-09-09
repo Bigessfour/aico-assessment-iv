@@ -18,6 +18,12 @@ variable "environment" {
   default     = "dev"
 }
 
+variable "log_retention_days" {
+  type        = number
+  description = "Retention for the platform CloudWatch log group. Short by default — class account."
+  default     = 7
+}
+
 variable "cluster_name" {
   type        = string
   description = "Existing class EKS cluster name. Referenced only — never created here."

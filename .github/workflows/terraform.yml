@@ -1,0 +1,89 @@
+# Terraform lifecycle in CI.
+#
+#   pull_request touching terraform/  → fmt check, validate, plan (read-only)
+#   workflow_dispatch                 → plan | apply | destroy
+#
+# destroy is gated behind a typed confirmation and only ever removes what is in
+# THIS state: SSM parameters, the platform log group, our four namespaces,
+# platform RBAC, and platform-metadata. It cannot touch the shared EKS cluster,
+# which this stack reads as a data source and never manages.
+name: Terraform
+
+on:
+  pull_request:
+    branches: [main]
+    paths:
+      - "terraform/**"
+      - ".github/workflows/terraform.yml"
+  workflow_dispatch:
+    inputs:
+      action:
+        description: "plan, apply, or destroy"
+        type: choice
+        options: [plan, apply, destroy]
+        default: plan
+      confirm:
+        description: "Type destroy-my-infra to allow destroy (ignored otherwise)"
+        type: string
+        default: ""
+
+env:
+  AWS_REGION: us-east-1
+  TF_IN_AUTOMATION: "true"
+
+jobs:
+  terraform:
+    name: ${{ github.event_name == 'pull_request' && 'plan' || inputs.action }}
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: terraform
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Guard destroy behind a typed confirmation
+        if: inputs.action == 'destroy'
+        run: |
+          if [[ "${{ inputs.confirm }}" != "destroy-my-infra" ]]; then
+            echo "::error::destroy requires confirm=destroy-my-infra"
+            exit 1
+          fi
+          echo "confirmation accepted"
+
+      - uses: hashicorp/setup-terraform@v3
+        with:
+          terraform_version: "1.15.4"
+          terraform_wrapper: false
+
+      - name: Check formatting
+        run: terraform fmt -check -recursive
+
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region: ${{ env.AWS_REGION }}
+
+      - name: Init (S3 backend + DynamoDB lock)
+        run: terraform init -input=false
+
+      - name: Validate
+        run: terraform validate
+
+      - name: Plan
+        if: github.event_name == 'pull_request' || inputs.action == 'plan'
+        run: terraform plan -input=false -no-color
+
+      - name: Apply
+        if: inputs.action == 'apply'
+        run: terraform apply -input=false -auto-approve -no-color
+
+      - name: Destroy
+        if: inputs.action == 'destroy'
+        run: terraform destroy -input=false -auto-approve -no-color
+
+      - name: Outputs
+        if: inputs.action == 'apply'
+        run: terraform output -no-color

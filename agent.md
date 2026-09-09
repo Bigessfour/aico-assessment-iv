@@ -11,7 +11,7 @@ Ship a **demoable internal ML platform** that a grader can reproduce from the RE
 
 Score the **required rubric first**. Bonuses are stretch after the required vertical is green. A late or incomplete required slice costs more than a missing bonus.
 
-**Current risk is low for required slices.** Speaker notes added. Optional: prune merged remote branches.
+**All required rubric items and every listed bonus are implemented on `main`.** Remaining work is the presentation itself (rehearsal, demo order, Q&A) plus optional branch cleanup.
 
 Scenario (locked): **Scenario 1 — ML Platform**  
 Teams / SageMaker endpoints:
@@ -84,26 +84,23 @@ Mark a checklist item **done** only after it exists on the branch you are workin
 
 ---
 
-## Honest rubric read
-
-If you presented tomorrow as-is: live platform + README carry **K8s / SageMaker / Actions required / UI / Docs**. Terraform is strong once PR #5 merges. Missing: controlled-failure bonus, Actions stretch, speaker notes.
+## Honest rubric read (2026-09-09, after the bonus sweep)
 
 | Section | Weight | Estimate | Why |
 |---------|--------|----------|-----|
-| Kubernetes | 30% | Strong | Three ns, probes, quotas, ClusterIP. Missing controlled-failure **bonus** |
-| SageMaker | 25% | Strong | Three wrappers, isolation in Actions, 502/timeout path, gateway + variant **label** |
-| Actions | 15% | Good required, thin bonus | Real deploy green on `main`. No rollback / `workflow_run` / lint / namespaced destroy |
-| UI | 10% | Met | React + Tailwind; polling + version + test-request |
-| Terraform | 10% | Strong on PR #5 | Remote state + K8s provider; do not own `k8s-training-cluster` |
-| Docs | 10% | Good | README + mermaid + teardown; speaker notes still open |
+| Kubernetes | 30% | Strong | Three ns + platform, three probes each, ResourceQuota + LimitRange everywhere, reversible failure demos |
+| SageMaker | 25% | Strong | Three wrappers, isolation proven in Actions, 502/504 paths, gateway, weighted variant split with counters |
+| Actions | 15% | Strong | deploy, CI (validate + pytest + dashboard build), terraform, lint, rollback, destroy-workloads, chained verify |
+| UI | 10% | Strong | React + Tailwind; polling, service + model version, request counts, test-request (4 of 4 options) |
+| Terraform | 10% | Strong | Real AWS resources (SSM catalog + log group), K8s namespaces/RBAC/metadata ConfigMap, S3 + DynamoDB state |
+| Docs | 10% | Good | README + mermaid + teardown + History narrative; presentation rehearsal outstanding |
 
-### Walkthrough gaps that will show
+### Things to say out loud before a grader asks
 
-1. **Terraform** — claim only after PR #5 is on `main`; never own the class cluster.
-2. **A/B is a label, not two models** — do not claim two SageMaker variants.
-3. **Actions bonuses** cheapest remaining stretch: rollback, `ci`→`deploy` via `workflow_run`, dry-run lint, destroy only our namespaces.
-4. **Controlled failure** still needed for K8s bonus: break `/ready` or trip quota, capture in History.md, restore.
-5. **Speaker notes** — `docs/presentation-notes.md`.
+1. **A/B is a gateway-side split, not two SageMaker production variants.** Weighted labels `baseline` / `candidate`, forwarded as `X-Model-Variant`, counted on `/stats`.
+2. **Gateway counters are process-local** and reset on pod restart. Deliberate: an ops demo, not Prometheus.
+3. **Terraform never owns the class cluster** — data source only. It owns SSM parameters, the platform log group, our namespaces, platform RBAC, and `platform-metadata`.
+4. **Two ConfigMap owners by design, never for the same object.** App config is Actions/YAML; infra facts are Terraform.
 
 ---
 
@@ -145,34 +142,40 @@ If you presented tomorrow as-is: live platform + README carry **K8s / SageMaker 
 - [x] Real `deploy.yml` green on `main`
 - [x] Gateway + ops dashboard on `main`
 - [x] **Rewrite README** (scenario, mermaid, setup, deploy, verify, teardown) — merged via PR #6
-- [x] Terraform lifecycle for namespaces/ConfigMaps/RBAC + remote state (merged PR #5)
+- [x] Terraform provisions real AWS resources (SSM catalog + CloudWatch log group) + namespaces/RBAC + remote state
 - [x] Architecture diagram + teardown in README (mermaid + teardown section)
 - [x] `docs/presentation-notes.md`
-
-### Bonuses still open
-
-- [x] `docs/presentation-notes.md` + leftover remote branch cleanup
 
 ### Bonuses done (say accurately)
 
 - [x] Gateway single entry point
-- [x] A/B **label** via `WEIGHT_A` (not dual SageMaker endpoints)
-- [x] React ops UI + Tailwind styling + live poll + version + test-predict
-- [x] Terraform remote state S3 + DynamoDB lock + K8s provider (ns/ConfigMaps/RBAC)
-- [x] `scripts/verify.sh` + `scripts/demo-failure.sh` (quota + ready) with History.md evidence + restore
-- [x] Actions: rollback, lint dry-run, namespaced destroy, deploy→verify chain, `git_ref` targeting
+- [x] Weighted A/B split (`baseline` / `candidate`) + `X-Model-Variant` passthrough + per-variant counters — **one** SageMaker production variant behind both
+- [x] `MODEL_VERSION` per team ConfigMap, surfaced on the dashboard
+- [x] React ops UI + Tailwind: live poll, service + model version, request counts, test-predict (4 of 4 optional features)
+- [x] Terraform remote state S3 + DynamoDB lock + K8s provider (namespaces, RBAC, `platform-metadata` ConfigMap)
+- [x] `scripts/verify.sh` (now including ConfigMap↔SSM drift) + `scripts/demo-failure.sh` (quota + ready) with History.md evidence + restore
+- [x] Actions: rollback, kubeconform lint, namespaced destroy, terraform plan/apply/destroy, deploy→verify chain, `git_ref` targeting
+- [x] Actions "run tests": 18 pytest contract tests + dashboard `npm ci && npm run build` on every PR
 - [x] Code-review cleanup: ConfigMap single owner, deploy→verify.sh, drop example seed
+
+### Still open
+
+- [ ] Presentation rehearsal / demo track (next work item)
+- [ ] Optional: delete leftover merged remote feature branches
 
 ---
 
-## Execution order (updated — docs first)
+## Execution order (updated — presentation next)
 
-The live platform slice is standing. Prioritize grader-facing clarity, then close Terraform on `main`, then cheap bonuses.
+Required slices and bonuses are all on `main`. What remains:
 
-1. Optional: delete leftover merged remote feature branches.
-2. Keep `agent.md` ground truth honest after each merge (this file).
+1. Run `Actions → Terraform → apply` so the SSM catalog and log group exist before the demo, then `scripts/verify.sh` to confirm no drift.
+2. Presentation: rehearse the demo order in `docs/presentation-notes.md`, refresh it for counters / SSM / tests.
+3. Re-check SageMaker endpoints are `InService` shortly before presenting — the class cost-guard has reaped them before.
+4. Optional: delete leftover merged remote feature branches.
+5. Keep `agent.md` ground truth honest after each merge (this file).
 
-Remote state: S3 `aico-iv-steve-tfstate`, DynamoDB `aico-iv-steve-tflock`. K8s provider manages ns/ConfigMaps/RBAC; Deployments stay YAML.
+Remote state: S3 `aico-iv-steve-tfstate`, DynamoDB `aico-iv-steve-tflock`.
 
 ---
 
@@ -185,18 +188,20 @@ Remote state: S3 `aico-iv-steve-tfstate`, DynamoDB `aico-iv-steve-tflock`. K8s p
 
 ### Gateway
 - Namespace `platform`. Env URLs use `*.svc.cluster.local`.
-- `WEIGHT_A` is a weighted label only — presentation honesty required.
+- `WEIGHT_A` splits between `VARIANT_A_LABEL` / `VARIANT_B_LABEL`, forwarded as `X-Model-Variant`. One SageMaker variant behind both — presentation honesty required.
+- Counters are in-process: `/stats` and the `requests` block inside `/health`. They reset on restart.
 - Demo: port-forward `gateway-api` or use dashboard `/api`.
 
 ### Dashboard
 - Poll gateway aggregate `/health` every few seconds.
-- Show owner, version, last check, green/red.
+- Show owner, service version, model version, request count, last check, green/red, plus total/failed/variant counter cards.
 - Test-request: `POST /predict/{team}` and show `endpoint` + `variant` in JSON.
 - In-cluster: nginx proxies `/api` → `gateway-api.platform.svc.cluster.local`.
 
-### Terraform (PR #5)
-- Owns: namespaces, platform read Role/RoleBinding, remote state backend resources (bootstrap script).
-- Does not own: ConfigMaps (YAML/Actions), Deployments/Services/Secrets/quotas, or the class cluster.
+### Terraform
+- Owns: SSM parameters (`/ml-platform/dev/<team>/…`), platform CloudWatch log group, namespaces, platform read Role/RoleBinding, `platform-metadata` ConfigMap. Backend bucket/table come from the bootstrap script.
+- Does not own: app ConfigMaps (YAML/Actions), Deployments/Services/Secrets/quotas, SageMaker endpoints, or the class cluster.
+- CI path: PRs touching `terraform/` auto-plan; `Actions → Terraform` dispatches apply/destroy (destroy needs `destroy-my-infra`).
 - Lifecycle:
 
 ```text
