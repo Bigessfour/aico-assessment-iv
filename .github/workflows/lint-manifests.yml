@@ -1,4 +1,4 @@
-# Lint Kubernetes manifests with client-side dry-run (no cluster mutation).
+# Lint Kubernetes manifests offline (no cluster required).
 # Bonus: additional workflow for manifest lint.
 name: Lint manifests
 
@@ -11,29 +11,39 @@ on:
 
 jobs:
   lint:
-    name: kubectl dry-run client
+    name: kubeconform
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
 
-      - name: Install kubectl
-        uses: azure/setup-kubectl@v4
-        with:
-          version: "v1.30.0"
-
-      - name: Dry-run apply all team + platform manifests
+      - name: Install kubeconform
         run: |
           set -euo pipefail
+          VER=v0.6.7
+          curl -fsSL "https://github.com/yannh/kubeconform/releases/download/${VER}/kubeconform-linux-amd64.tar.gz" \
+            | tar -xz -C /usr/local/bin kubeconform
+          kubeconform -v
+
+      - name: Validate team + platform manifests
+        run: |
+          set -euo pipefail
+          # Skip secret.example.yml from "must deploy" checks but still validate shape
           for team in fraud recommendations forecasting; do
-            echo "=== dry-run $team ==="
-            for f in namespace.yml quota.yml configmap.yml deployment.yml service.yml; do
-              kubectl apply --dry-run=client -f "k8s/${team}/${f}"
-            done
-            # Never apply secret.example.yml for real; still validate shape
-            kubectl apply --dry-run=client -f "k8s/${team}/secret.example.yml"
+            echo "=== $team ==="
+            kubeconform -summary -strict -ignore-missing-schemas \
+              "k8s/${team}/namespace.yml" \
+              "k8s/${team}/quota.yml" \
+              "k8s/${team}/configmap.yml" \
+              "k8s/${team}/deployment.yml" \
+              "k8s/${team}/service.yml" \
+              "k8s/${team}/secret.example.yml"
           done
-          echo "=== dry-run platform ==="
-          for f in namespace.yml quota.yml configmap.yml deployment-gateway.yml service-gateway.yml dashboard.yml; do
-            kubectl apply --dry-run=client -f "k8s/platform/${f}"
-          done
+          echo "=== platform ==="
+          kubeconform -summary -strict -ignore-missing-schemas \
+            k8s/platform/namespace.yml \
+            k8s/platform/quota.yml \
+            k8s/platform/configmap.yml \
+            k8s/platform/deployment-gateway.yml \
+            k8s/platform/service-gateway.yml \
+            k8s/platform/dashboard.yml
           echo "LINT OK"
