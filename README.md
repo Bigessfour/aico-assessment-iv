@@ -85,7 +85,7 @@ k8s/
 .github/workflows/
   ci.yml                # PR/main: Python syntax + manifest presence
   deploy.yml            # main: matrix build → GHCR → EKS apply → verify
-terraform/              # see Terraform section (expanded stack may be on a follow-up PR)
+terraform/              # namespaces, ConfigMaps, platform RBAC + remote state
 scripts/                # helpers (e.g. TF backend bootstrap when present)
 History.md              # issues hit + fixes
 getting_started.md      # original upstream bootstrap notes
@@ -176,12 +176,11 @@ The UI live-polls gateway `/health` (via nginx `/api`), shows owner/version/endp
 
 ## Terraform
 
-**Do not** `terraform destroy` the class EKS cluster. This stack (when the expanded files are on your branch/`main`) only manages **our** namespaces, ConfigMaps, and platform RBAC, plus optional remote state.
+**Do not** `terraform destroy` the class EKS cluster. This stack only manages **our** namespaces, ConfigMaps, and platform RBAC, plus remote state (S3 + DynamoDB). The cluster is a data source only.
 
 ```bash
 export AWS_PROFILE=codeplatoon
-# If present:
-# ./scripts/bootstrap-tf-backend.sh
+./scripts/bootstrap-tf-backend.sh   # once per account
 cd terraform
 terraform init
 terraform plan
@@ -189,8 +188,7 @@ terraform apply
 terraform destroy   # ONLY resources in this state
 ```
 
-Details and import notes: [terraform/README.md](terraform/README.md) (when the expanded stack is merged).  
-On `main` before that merge, `terraform/` may still be the upstream skeleton — check `ls terraform/` and [agent.md](agent.md) ground truth.
+Details and import notes: [terraform/README.md](terraform/README.md).
 
 ---
 
@@ -203,7 +201,7 @@ kubectl delete namespace fraud recommendations forecasting platform --wait=false
 # Optional: delete GHCR packages / SageMaker endpoints only if you own them and instructors allow
 ```
 
-If Terraform manages namespaces on your branch:
+Preferred teardown when Terraform state is initialized:
 
 ```bash
 cd terraform && terraform destroy

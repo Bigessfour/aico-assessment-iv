@@ -11,7 +11,7 @@ Ship a **demoable internal ML platform** that a grader can reproduce from the RE
 
 Score the **required rubric first**. Bonuses are stretch after the required vertical is green. A late or incomplete required slice costs more than a missing bonus.
 
-**Current risk is not “does it run” — it is “can someone else understand and tear it down from the repo.”** README is stale relative to the live platform.
+**Current risk is shrinking:** README matches the live platform (PR #6). Land Terraform on `main`, then failure-demo + Actions bonuses.
 
 Scenario (locked): **Scenario 1 — ML Platform**  
 Teams / SageMaker endpoints:
@@ -28,10 +28,10 @@ AWS: profile `codeplatoon`, account `388691194728`, region `us-east-1`, cluster 
 
 ## Ground truth (do not invent a greener state)
 
-As of **2026-09-08**. `main` tip: **`26daf23`** (merge of PR #4).  
+As of **2026-09-08**. `main` tip: **`712c6a7`** (merge of PR #6 README).  
 Latest **CI** and **Build and Deploy** on `main` succeeded ([deploy run](https://github.com/Bigessfour/aico-assessment-iv/actions/runs/34294222918)).
 
-### Done on `main` (PRs #1–#4 merged)
+### Done on `main` (PRs #1–#6; Terraform via PR #5 when merged)
 
 | Slice | Status | Evidence |
 |-------|--------|----------|
@@ -41,28 +41,29 @@ Latest **CI** and **Build and Deploy** on `main` succeeded ([deploy run](https:/
 | Gateway | **Done** | `services/gateway` + `k8s/platform`. Aggregate `/health`, `POST /predict/{team}`, ClusterIP |
 | A/B | **Done enough to talk** | ConfigMap `WEIGHT_A=80`; responses labeled `variant` A/B. **Not** two SageMaker model variants — say that out loud |
 | Ops UI | **Done** | React + Tailwind (CDN): live poll, version, owner, test-predict via nginx `/api` → gateway |
+| README + architecture | **Done** | PR #6. Mermaid + setup/deploy/verify/teardown |
+| Terraform | **This PR #5** | Remote state + K8s provider for ns/ConfigMaps/platform RBAC; cluster data-source only |
 | `History.md` | **Good** | Failures + fixes recorded |
 
 ### Not on `main` yet / behind
 
 | Slice | Status | Notes |
 |-------|--------|-------|
-| Terraform | **Open PR #5** — not merged | Branch `feature/terraform-platform`: remote state S3/DynamoDB + K8s provider for ns/ConfigMaps/RBAC. **Until merge, `main` still has the upstream skeleton only** (`terraform/main.tf` ~35 lines) |
-| Docs graders open first | **Behind** | README still describes starter layout / deploy template. No architecture diagram, teardown runbook, or speaker notes |
 | Controlled failure demo | **Not started** | K8s bonus |
 | Actions bonuses | **Thin** | No rollback, no `workflow_run` chain, no lint/destroy-workloads. `workflow_dispatch` `teams` input is a start |
-| Leftover remote branches | Cleanup | `feature/gateway-and-dashboard`, `feature/terraform-platform` (and any other merged leftovers) can be deleted after PR #5 lands |
+| Presentation notes | **Missing** | `docs/presentation-notes.md` |
+| Leftover remote branches | Cleanup | Delete merged feature branches after PR #5 lands |
 
-### What is actually on `main`
+### What is actually on `main` (plus this PR for terraform/)
 
 ```text
 services/   fraud-detection, recommendations, forecasting, gateway
 k8s/        fraud, recommendations, forecasting, platform
 dashboard/  React ops UI (Tailwind via CDN — package.json has no tailwind dep)
 .github/    ci.yml (syntax + manifest presence) + deploy.yml (real path)
-terraform/  skeleton only on main (full stack on PR #5)
-docs/       assessment-brief.md only
-README.md   STALE — still reads like the seed
+terraform/  full stack on PR #5 (remote state + k8s provider); skeleton only until merge
+docs/       assessment-brief.md (presentation-notes still TODO)
+README.md   grader-facing (PR #6)
 ```
 
 ### Demo path (verified)
@@ -85,7 +86,7 @@ Mark a checklist item **done** only after it exists on the branch you are workin
 
 ## Honest rubric read
 
-If you presented tomorrow as-is: live platform carries **K8s / SageMaker / Actions required / UI**. Graders who start at README would think the repo is still the seed.
+If you presented tomorrow as-is: live platform + README carry **K8s / SageMaker / Actions required / UI / Docs**. Terraform is strong once PR #5 merges. Missing: controlled-failure bonus, Actions stretch, speaker notes.
 
 | Section | Weight | Estimate | Why |
 |---------|--------|----------|-----|
@@ -93,17 +94,16 @@ If you presented tomorrow as-is: live platform carries **K8s / SageMaker / Actio
 | SageMaker | 25% | Strong | Three wrappers, isolation in Actions, 502/timeout path, gateway + variant **label** |
 | Actions | 15% | Good required, thin bonus | Real deploy green on `main`. No rollback / `workflow_run` / lint / namespaced destroy |
 | UI | 10% | Met | React + Tailwind; polling + version + test-request |
-| Terraform | 10% | Weak on `main` | Skeleton until PR #5 merges; then document + point README at `terraform/README.md` |
-| Docs | 10% | Weak | `History.md` good; README stale; no diagram / teardown / speaker notes |
+| Terraform | 10% | Strong on PR #5 | Remote state + K8s provider; do not own `k8s-training-cluster` |
+| Docs | 10% | Good | README + mermaid + teardown; speaker notes still open |
 
 ### Walkthrough gaps that will show
 
-1. **README is wrong** — still says deploy template / dashboard shell. Highest score-per-minute fix.
-2. **Terraform on `main` does not manage anything** until PR #5 merges. Even then: do not own `k8s-training-cluster`.
-3. **No architecture diagram or teardown** in grader-facing docs.
-4. **A/B is a label, not two models** — do not claim two SageMaker variants.
-5. **Actions bonuses** cheapest remaining stretch after docs: rollback, `ci`→`deploy` via `workflow_run`, dry-run lint, destroy only our namespaces.
-6. **Controlled failure** still needed for K8s bonus: break `/ready` or trip quota, capture in History.md, restore.
+1. **Terraform** — claim only after PR #5 is on `main`; never own the class cluster.
+2. **A/B is a label, not two models** — do not claim two SageMaker variants.
+3. **Actions bonuses** cheapest remaining stretch: rollback, `ci`→`deploy` via `workflow_run`, dry-run lint, destroy only our namespaces.
+4. **Controlled failure** still needed for K8s bonus: break `/ready` or trip quota, capture in History.md, restore.
+5. **Speaker notes** — `docs/presentation-notes.md`.
 
 ---
 
@@ -144,22 +144,23 @@ If you presented tomorrow as-is: live platform carries **K8s / SageMaker / Actio
 - [x] Routing isolation evidence (Actions + History.md)
 - [x] Real `deploy.yml` green on `main`
 - [x] Gateway + ops dashboard on `main`
-- [ ] **Merge PR #5** so Terraform is on `main` (or re-land if abandoned)
-- [x] **Rewrite README** (scenario, mermaid, setup, deploy, verify, teardown) — on docs PR; merge to `main`
-- [ ] Architecture diagram + teardown (README and/or `docs/architecture.md`)
+- [x] **Rewrite README** (scenario, mermaid, setup, deploy, verify, teardown) — merged via PR #6
+- [x] Terraform lifecycle for namespaces/ConfigMaps/RBAC + remote state (this PR #5)
+- [x] Architecture diagram + teardown in README (mermaid + teardown section)
 - [ ] `docs/presentation-notes.md`
 
 ### Bonuses still open
 
 - [ ] `scripts/demo-failure.sh` + restore + History.md capture
 - [ ] Actions: rollback (`workflow_dispatch`), `workflow_run` chain, lint dry-run, namespaced destroy
-- [ ] Helper scripts: `scripts/verify.sh`, `scripts/apply-secrets.sh`, `scripts/bootstrap-kube.sh` (bootstrap-tf exists on PR #5)
+- [ ] Helper scripts: `scripts/verify.sh` (bootstrap-tf exists on this branch)
 
 ### Bonuses done (say accurately)
 
 - [x] Gateway single entry point
 - [x] A/B **label** via `WEIGHT_A` (not dual SageMaker endpoints)
 - [x] React ops UI + Tailwind styling + live poll + version + test-predict
+- [x] Terraform remote state S3 + DynamoDB lock + K8s provider (ns/ConfigMaps/RBAC)
 
 ---
 
@@ -167,14 +168,13 @@ If you presented tomorrow as-is: live platform carries **K8s / SageMaker / Actio
 
 The live platform slice is standing. Prioritize grader-facing clarity, then close Terraform on `main`, then cheap bonuses.
 
-1. **Rewrite README** (scenario, mermaid architecture, setup, deploy, verify curls, teardown). Highest score per minute.
-2. **Land PR #5** (Terraform remote state + K8s provider) and point README at `terraform/README.md` lifecycle commands.
-3. `scripts/demo-failure.sh` + `scripts/verify.sh` + History.md evidence (always restore).
-4. Actions bonuses: rollback + lint + namespaced-destroy (+ optional `workflow_run` chain).
-5. `docs/presentation-notes.md`; delete leftover merged remote feature branches.
-6. Keep `agent.md` ground truth honest after each merge (this file).
+1. **Land PR #5** (this branch) so Terraform is on `main`; README already points at `terraform/README.md`.
+2. `scripts/demo-failure.sh` + `scripts/verify.sh` + History.md evidence (always restore).
+3. Actions bonuses: rollback + lint + namespaced-destroy (+ optional `workflow_run` chain).
+4. `docs/presentation-notes.md`; delete leftover merged remote feature branches.
+5. Keep `agent.md` ground truth honest after each merge (this file).
 
-Do **not** claim Terraform or a fresh README are done on `main` until the commits are actually there.
+Remote state: S3 `aico-iv-steve-tfstate`, DynamoDB `aico-iv-steve-tflock`. K8s provider manages ns/ConfigMaps/RBAC; Deployments stay YAML.
 
 ---
 

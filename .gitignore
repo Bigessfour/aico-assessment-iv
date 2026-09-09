@@ -5,6 +5,8 @@ dist/
 *.tfstate
 *.tfstate.backup
 .terraform/
+terraform/tfplan
+# Keep .terraform.lock.hcl committed for reproducible provider versions
 __pycache__/
 *.pyc
 .venv/

@@ -1,35 +1,9 @@
-terraform {
-  required_providers {
-    aws = {
-      source  = "hashicorp/aws"
-      version = "~> 5.0"
-    }
-  }
-}
+# Legacy skeleton entrypoint kept so `terraform/` still has a clear main file.
+# Real logic lives in versions.tf / providers.tf / k8s.tf / variables.tf / outputs.tf.
+#
+# Prefer: terraform init && terraform plan && terraform apply
+# See README.md in this directory for import + teardown notes.
 
-provider "aws" {
-  region = var.aws_region
-}
-
-variable "aws_region" {
-  type    = string
-  default = "us-east-1"
-}
-
-variable "project_name" {
-  type    = string
-  default = "ml-platform"
-}
-
-variable "environment" {
-  type    = string
-  default = "dev"
-}
-
-output "region" {
-  value = var.aws_region
-}
-
-output "project_name" {
-  value = var.project_name
+locals {
+  stack_summary = "Assessment IV Terraform manages namespaces/ConfigMaps/RBAC only"
 }

@@ -190,10 +190,18 @@ curl http://127.0.0.1:18080/health
 
 Replaced the starter README with grader-facing docs: Scenario 1, mermaid architecture, real repo layout, deploy/verify/teardown, dashboard demo, Terraform caveats, presentation honesty on A/B labels.
 
+## Terraform platform stack (2026-09-08)
+
+- Remote state: S3 `aico-iv-steve-tfstate` + DynamoDB `aico-iv-steve-tflock` (bootstrap script)
+- Kubernetes provider manages namespaces, team/gateway ConfigMaps, platform read Role/RoleBinding
+- Class cluster is **data-source only** (`k8s-training-cluster`)
+- First apply: imported existing namespaces/ConfigMaps, then `Apply complete! Resources: 0 added, 4 changed, 0 destroyed`
+- Docs: `terraform/README.md` with init/plan/apply/destroy + import notes
+
+Deprecation note: Terraform warns `dynamodb_table` → prefer `use_lockfile` later; DynamoDB lock still works for the rubric.
+
 ## Still to do (platform)
 
-
-- Terraform lifecycle + optional remote state / k8s provider
-- Controlled failure demo script
+- Controlled failure demo script + verify helper
 - Actions bonuses (rollback, branch targeting, lint/destroy-workloads)
-- Scenario 1 README + architecture diagram + teardown + presentation notes + helper scripts
+- Presentation notes + leftover branch cleanup
