@@ -1,6 +1,6 @@
 # Agent instructions — Assessment IV
 
-Repo: `Bigessfour/aico-assessment-iv` (private)  
+Repo: [`Bigessfour/aico-assessment-iv`](https://github.com/Bigessfour/aico-assessment-iv) (private)  
 Upstream brief: [docs/assessment-brief.md](docs/assessment-brief.md)  
 Working log: [History.md](History.md)  
 Machine: MacBook Pro (Apple Silicon). Cluster workers are **linux/amd64**.
@@ -11,8 +11,16 @@ Ship a **demoable internal ML platform** that a grader can reproduce from the RE
 
 Score the **required rubric first**. Bonuses are stretch after the required vertical is green. A late or incomplete required slice costs more than a missing bonus.
 
+**Current risk is not “does it run” — it is “can someone else understand and tear it down from the repo.”** README is stale relative to the live platform.
+
 Scenario (locked): **Scenario 1 — ML Platform**  
-Teams: Fraud (`aico-iv-fraud`) · Recommendations (`aico-iv-recs`) · Forecasting (`aico-iv-forecast`)
+Teams / SageMaker endpoints:
+
+| Team namespace | SageMaker `ENDPOINT_NAME` |
+|----------------|---------------------------|
+| `fraud` | `aico-iv-fraud` |
+| `recommendations` | `aico-iv-recs` |
+| `forecasting` | `aico-iv-forecast` |
 
 AWS: profile `codeplatoon`, account `388691194728`, region `us-east-1`, cluster `k8s-training-cluster` (class-shared EKS).
 
@@ -20,22 +28,82 @@ AWS: profile `codeplatoon`, account `388691194728`, region `us-east-1`, cluster 
 
 ## Ground truth (do not invent a greener state)
 
-### `main` (as of 2026-09-08, post PR #2 merge)
+As of **2026-09-08**. `main` tip: **`26daf23`** (merge of PR #4).  
+Latest **CI** and **Build and Deploy** on `main` succeeded ([deploy run](https://github.com/Bigessfour/aico-assessment-iv/actions/runs/34294222918)).
 
-- Three team slices on disk: `fraud` / `recommendations` / `forecasting` FastAPI + `k8s/<team>/` (ns, ConfigMap, Secret example, probes, quota/LimitRange, ClusterIP).
-- Live cluster (when last verified): all three namespaces Ready with isolated `ENDPOINT_NAME` values.
-- `terraform/main.tf` is still the upstream **skeleton** (provider + variables + two outputs). No remote state, no K8s provider, no real resources.
-- `.github/workflows/deploy.yml`: replaced on branch `feature/real-deploy-workflow` — real matrix build → GHCR → apply → verify. Until that PR merges, `main` may still have the old template.
-- `.github/workflows/ci.yml` syntax-checks all three services + manifest trees.
-- `dashboard/` is the upstream React + Vite **shell** (hardcoded Example Service, one-shot fetch, no Tailwind/MUI).
-- README is still a starter blurb. No architecture diagram, no teardown runbook.
+### Done on `main` (PRs #1–#4 merged)
 
-### Naming
+| Slice | Status | Evidence |
+|-------|--------|----------|
+| Three team FastAPI + EKS | **Done** | PR #2. Namespaces `fraud` / `recommendations` / `forecasting`. Isolated `ENDPOINT_NAME` verified in Actions |
+| Probes, ConfigMaps, Secrets, quota | **Done** | Per-team manifests; deploy job creates AWS/GHCR secrets from Actions secrets (never apply `secret.example.yml`) |
+| Real `deploy.yml` | **Done** | PR #3 + #4. Matrix `linux/amd64` → GHCR (`:latest` + SHA) → apply → pin → rollout + isolation + in-cluster `/health` `/ready` |
+| Gateway | **Done** | `services/gateway` + `k8s/platform`. Aggregate `/health`, `POST /predict/{team}`, ClusterIP |
+| A/B | **Done enough to talk** | ConfigMap `WEIGHT_A=80`; responses labeled `variant` A/B. **Not** two SageMaker model variants — say that out loud |
+| Ops UI | **Done** | React + Tailwind (CDN): live poll, version, owner, test-predict via nginx `/api` → gateway |
+| `History.md` | **Good** | Failures + fixes recorded |
 
-- Namespaces in manifests are `fraud` / `recommendations` / `forecasting` (not `aico-iv-*`).
-- `aico-iv-*` are **SageMaker endpoint names** only. Do not rename namespaces unless updating every apply/verify command.
+### Not on `main` yet / behind
 
-Mark a checklist item done only after it exists on the branch you are working and is recorded in `History.md`.
+| Slice | Status | Notes |
+|-------|--------|-------|
+| Terraform | **Open PR #5** — not merged | Branch `feature/terraform-platform`: remote state S3/DynamoDB + K8s provider for ns/ConfigMaps/RBAC. **Until merge, `main` still has the upstream skeleton only** (`terraform/main.tf` ~35 lines) |
+| Docs graders open first | **Behind** | README still describes starter layout / deploy template. No architecture diagram, teardown runbook, or speaker notes |
+| Controlled failure demo | **Not started** | K8s bonus |
+| Actions bonuses | **Thin** | No rollback, no `workflow_run` chain, no lint/destroy-workloads. `workflow_dispatch` `teams` input is a start |
+| Leftover remote branches | Cleanup | `feature/gateway-and-dashboard`, `feature/terraform-platform` (and any other merged leftovers) can be deleted after PR #5 lands |
+
+### What is actually on `main`
+
+```text
+services/   fraud-detection, recommendations, forecasting, gateway
+k8s/        fraud, recommendations, forecasting, platform
+dashboard/  React ops UI (Tailwind via CDN — package.json has no tailwind dep)
+.github/    ci.yml (syntax + manifest presence) + deploy.yml (real path)
+terraform/  skeleton only on main (full stack on PR #5)
+docs/       assessment-brief.md only
+README.md   STALE — still reads like the seed
+```
+
+### Demo path (verified)
+
+```bash
+export AWS_PROFILE=codeplatoon
+kubectl -n platform port-forward svc/ops-dashboard 3000:80
+# http://localhost:3000
+```
+
+### Naming (do not confuse)
+
+- **Namespaces:** `fraud` / `recommendations` / `forecasting` / `platform`
+- **SageMaker endpoint names:** `aico-iv-*` (ConfigMap `ENDPOINT_NAME` only)
+- Do not rename namespaces unless every apply/verify/docs command is updated
+
+Mark a checklist item **done** only after it exists on the branch you are working **and** is recorded in `History.md`. Prefer “done on `main`” language for grader-facing claims.
+
+---
+
+## Honest rubric read
+
+If you presented tomorrow as-is: live platform carries **K8s / SageMaker / Actions required / UI**. Graders who start at README would think the repo is still the seed.
+
+| Section | Weight | Estimate | Why |
+|---------|--------|----------|-----|
+| Kubernetes | 30% | Strong | Three ns, probes, quotas, ClusterIP. Missing controlled-failure **bonus** |
+| SageMaker | 25% | Strong | Three wrappers, isolation in Actions, 502/timeout path, gateway + variant **label** |
+| Actions | 15% | Good required, thin bonus | Real deploy green on `main`. No rollback / `workflow_run` / lint / namespaced destroy |
+| UI | 10% | Met | React + Tailwind; polling + version + test-request |
+| Terraform | 10% | Weak on `main` | Skeleton until PR #5 merges; then document + point README at `terraform/README.md` |
+| Docs | 10% | Weak | `History.md` good; README stale; no diagram / teardown / speaker notes |
+
+### Walkthrough gaps that will show
+
+1. **README is wrong** — still says deploy template / dashboard shell. Highest score-per-minute fix.
+2. **Terraform on `main` does not manage anything** until PR #5 merges. Even then: do not own `k8s-training-cluster`.
+3. **No architecture diagram or teardown** in grader-facing docs.
+4. **A/B is a label, not two models** — do not claim two SageMaker variants.
+5. **Actions bonuses** cheapest remaining stretch after docs: rollback, `ci`→`deploy` via `workflow_run`, dry-run lint, destroy only our namespaces.
+6. **Controlled failure** still needed for K8s bonus: break `/ready` or trip quota, capture in History.md, restore.
 
 ---
 
@@ -44,13 +112,14 @@ Mark a checklist item done only after it exists on the branch you are working an
 1. **Do not** create, modify, or `terraform destroy` the class EKS cluster, VPC, node groups, or other students' namespaces.
 2. Terraform may **reference / data-source** `k8s-training-cluster`. It must not try to own it.
 3. Never commit `.env`, `.env.secrets`, live Secret YAML, AWS keys, or `GHCR_TOKEN`.
-4. Prefer `AWS_PROFILE=codeplatoon` (Keychain) over `aws login` for deploy loops — login grants expire mid-session (see History.md #5).
-5. Images: `docker build --platform linux/amd64` then push GHCR. Arm64 images cause `ImagePullBackOff` (History.md #4).
-6. Do not add curl to every image just for demos; verify with `kubectl port-forward` from the laptop (History.md #6).
-7. Keep Services **ClusterIP** unless a LoadBalancer is required for the dashboard/gateway demo. Class clusters fill up with leftover LBs.
+4. Prefer `AWS_PROFILE=codeplatoon` (Keychain) over `aws login` for deploy loops — login grants expire mid-session (see History.md).
+5. Images: `docker build --platform linux/amd64` then push GHCR. Arm64 → `ImagePullBackOff`.
+6. Prefer `kubectl port-forward` for demos; do not add curl to every image just for checks.
+7. Keep Services **ClusterIP** unless an LB is truly required. Class clusters fill up with leftover LBs.
 8. Quotas are tight. Stay at **1 replica** unless a failure demo needs a second pod, then scale back.
 9. After a controlled-failure demo, **restore** the healthy state before leaving the session.
-10. Do not rewrite working fraud/recs/forecast apps into a monorepo framework. Duplicate-and-specialize is the class pattern.
+10. Do not rewrite working team apps into a monorepo framework. Duplicate-and-specialize is the class pattern.
+11. Destroy workflows may delete **only** `fraud` / `recommendations` / `forecasting` / `platform` — never the cluster.
 
 ---
 
@@ -58,128 +127,98 @@ Mark a checklist item done only after it exists on the branch you are working an
 
 | Weight | Section | Required bar | Bonus (only after required) |
 |--------|---------|--------------|-----------------------------|
-| 30% | K8s | 3 namespaces, ConfigMaps, Secrets, 3 probes, ResourceQuota + LimitRange | One **reversible** controlled failure with script + History.md evidence |
-| 25% | SageMaker | 3 FastAPI wrappers, isolated routing, `/health` `/ready` `/predict`, one failure path (timeout/502 already in fraud app) | Gateway proxy + simple A/B or version label |
-| 15% | Actions | Real `deploy.yml`: build → GHCR → kubeconfig → apply → verify | Rollback job, branch targeting, chained workflows, destroy/lint/test workflows |
-| 10% | Terraform | Variables, outputs, documented `init/plan/apply/destroy` for **our** resources | S3+DynamoDB backend if we can create them; K8s provider for ns/RBAC/ConfigMaps |
-| 10% | UI | Multi-team health + owner; **at least two of**: live polling, version, request counts, test-request | Keep React; add Tailwind or MUI |
-| 10% | Docs | Repro README, architecture diagram, teardown, presentable talking points | Helper scripts; present early (human — prepare slides/notes now) |
+| 30% | K8s | 3 namespaces, ConfigMaps, Secrets, 3 probes, ResourceQuota + LimitRange | Reversible controlled failure + History.md evidence |
+| 25% | SageMaker | 3 FastAPI wrappers, isolated routing, `/health` `/ready` `/predict`, one failure path | Gateway (done) + A/B label (done — not two endpoints) |
+| 15% | Actions | Real `deploy.yml`: build → GHCR → apply → verify (done on `main`) | Rollback, branch targeting, chained workflows, lint/destroy |
+| 10% | Terraform | Vars/outputs + documented lifecycle for **our** resources | Remote state + K8s provider (implemented on PR #5; merge then update README) |
+| 10% | UI | Multi-team health + owner; ≥2 of poll / version / counts / test-request | React (done) + Tailwind (done via CDN) |
+| 10% | Docs | Repro README, architecture diagram, teardown, talking points | Helper scripts; present early (human) |
 
 ---
 
-## Required baseline checklist
+## Checklist
 
-- [x] Fraud FastAPI + EKS slice with probes, ConfigMap, Secrets, quota (on `main`)
-- [x] Recommendations + forecasting slices (PR #2 merged to `main`)
-- [x] Routing isolation evidence: each pod `ENDPOINT_NAME` matches its team (recorded in History.md)
-- [ ] Terraform lifecycle documented for whatever we actually manage (even if that is only tags/S3 state/K8s objects — not the cluster)
-- [x] Real `deploy.yml` (merged; Actions green on main)
-- [x] Ops dashboard with three teams + live poll + version + test-predict (branch `feature/gateway-and-dashboard`)
-- [ ] Architecture diagram + teardown docs in README or `docs/`
+### Required / platform (grader-facing)
 
----
+- [x] Fraud + recommendations + forecasting FastAPI/EKS slices on `main`
+- [x] Routing isolation evidence (Actions + History.md)
+- [x] Real `deploy.yml` green on `main`
+- [x] Gateway + ops dashboard on `main`
+- [ ] **Merge PR #5** so Terraform is on `main` (or re-land if abandoned)
+- [ ] **Rewrite README** (scenario, mermaid, setup, deploy, verify, teardown) — currently stale
+- [ ] Architecture diagram + teardown (README and/or `docs/architecture.md`)
+- [ ] `docs/presentation-notes.md`
 
-## Bonus checklist (pursue after required is demoable)
+### Bonuses still open
 
-### 1. Terraform
+- [ ] `scripts/demo-failure.sh` + restore + History.md capture
+- [ ] Actions: rollback (`workflow_dispatch`), `workflow_run` chain, lint dry-run, namespaced destroy
+- [ ] Helper scripts: `scripts/verify.sh`, `scripts/apply-secrets.sh`, `scripts/bootstrap-kube.sh` (bootstrap-tf exists on PR #5)
 
-| Bonus | Status | Done when |
-|-------|--------|-----------|
-| Remote state S3 + DynamoDB lock | pending | Unique bucket/table names (`aico-iv-steve-*` or similar); backend block in code; no creds in git; `History.md` records init. If IAM denies bucket create, document the denial and keep local state — do not block the rest of the project. |
-| K8s provider manages ns / RBAC / ConfigMaps | pending | Terraform apply creates the three namespaces + a platform Role/RoleBinding + ConfigMaps. Deployments may stay as YAML to avoid a big rewrite. Do not fight kubectl vs Terraform for the same object. |
+### Bonuses done (say accurately)
 
-### 2. Kubernetes
-
-| Bonus | Status | Done when |
-|-------|--------|-----------|
-| Controlled failure | pending | `scripts/demo-failure.sh` that (pick one, implement fully): readiness-gated traffic (break `/ready`, show Service endpoints empty, restore) **or** quota rejection (apply an oversized pod, show `Forbidden`, delete). Capture `kubectl` output in History.md. Always restore. |
-
-### 3. SageMaker / platform routing
-
-| Bonus | Status | Done when |
-|-------|--------|-----------|
-| Gateway | done (this PR) | `services/gateway` FastAPI: `POST /predict/{team}` and aggregate `GET /health`. In-cluster DNS. Demo: `kubectl -n platform port-forward svc/gateway-api 18080:80`. |
-| Model versioning / A/B | done (this PR) | ConfigMap `WEIGHT_A` on gateway; responses labeled `variant` A\|B. No extra SageMaker endpoints. |
-
-### 4. GitHub Actions
-
-| Bonus | Status | Done when |
-|-------|--------|-----------|
-| Rollback | pending | `workflow_dispatch` input `rollback` or `image_tag`; `kubectl set image` / rollout undo + verify. |
-| Branch targeting | pending | `main` → deploy namespaces; `feature/*` → plan/CI only, or a `preview` namespace if quota allows. |
-| Chained workflows | pending | `ci.yml` success gates `deploy.yml` via `workflow_run` **or** a reusable workflow. Avoid double-deploy on every push. |
-| Extra workflows | partial | Keep `ci.yml`. Add `lint-manifests.yml` (`kubeconform` or `kubectl --dry-run=client`). Optional `destroy-workloads.yml` that deletes **only** our three namespaces — never the cluster. |
-
-### 5. Ops UI
-
-| Bonus | Status | Done when |
-|-------|--------|-----------|
-| React framework | **satisfied by starter** | Do not replace with Flask/Streamlit. Enhance in place. |
-| Clean styling | done (this PR) | Tailwind CDN + IBM Plex; slate/teal ops theme. |
-| Features | done (this PR) | Live poll (~7s) + version field + test-request form against gateway. |
-
-### 6. Docs / presentation
-
-| Bonus | Status | Done when |
-|-------|--------|-----------|
-| Present early | human | Operator prepares 5-minute talk from README + History.md + diagram. Agent prepares speaker notes in `docs/presentation-notes.md`. |
-| Helper scripts | partial | `start.sh` exists. Add `scripts/apply-secrets.sh` (reads local env, applies Secret YAML from example), `scripts/bootstrap-kube.sh`, `scripts/verify.sh` (port-forward + curl three `/health` + `/ready`). |
+- [x] Gateway single entry point
+- [x] A/B **label** via `WEIGHT_A` (not dual SageMaker endpoints)
+- [x] React ops UI + Tailwind styling + live poll + version + test-predict
 
 ---
 
-## Execution order (required-first)
+## Execution order (updated — docs first)
 
-0. Land PR #2. Confirm three namespaces Ready on the cluster. Update History.md. Keep CI green.
-1. Real `deploy.yml` + verification steps (unlocks CI/CD required + most Actions bonuses).
-2. Gateway + dashboard talking to gateway (SageMaker bonus + UI required).
-3. Terraform: document lifecycle; add remote state **if permitted**; optionally move namespaces/ConfigMaps to the K8s provider.
-4. `scripts/demo-failure.sh` + History.md evidence.
-5. A/B weights on gateway; dashboard control.
-6. Rollback / branch targeting / lint / namespaced destroy workflows.
-7. README + architecture diagram + teardown + presentation notes + helper scripts.
+The live platform slice is standing. Prioritize grader-facing clarity, then close Terraform on `main`, then cheap bonuses.
 
-Do not start Terraform remote-state yak-shaving while `deploy.yml` is still a template or the dashboard still lists Example Service.
+1. **Rewrite README** (scenario, mermaid architecture, setup, deploy, verify curls, teardown). Highest score per minute.
+2. **Land PR #5** (Terraform remote state + K8s provider) and point README at `terraform/README.md` lifecycle commands.
+3. `scripts/demo-failure.sh` + `scripts/verify.sh` + History.md evidence (always restore).
+4. Actions bonuses: rollback + lint + namespaced-destroy (+ optional `workflow_run` chain).
+5. `docs/presentation-notes.md`; delete leftover merged remote feature branches.
+6. Keep `agent.md` ground truth honest after each merge (this file).
+
+Do **not** claim Terraform or a fresh README are done on `main` until the commits are actually there.
 
 ---
 
 ## Implementation notes (so the agent does not wander)
 
-### FastAPI services
-- Keep `/health` cheap (no AWS). Keep `/ready` as “config + client constructable”.
-- Keep invoke timeouts and HTTP 502 on SageMaker failure (already satisfies the required failure path).
-- Tag responses with `service`, `team`, `endpoint`, `version` so the dashboard and routing demo are obvious.
+### FastAPI team services
+- `/health` cheap (no AWS). `/ready` = config + client constructable.
+- Keep invoke timeouts and HTTP 502 on SageMaker failure.
+- Tag responses with `service`, `team`, `endpoint`, `version`.
 
 ### Gateway
-- ClusterIP in namespace `platform` (create it) or `fraud` if you want fewer namespaces.
-- Env: `FRAUD_URL=http://fraud-api.fraud.svc.cluster.local`, same for recs/forecast.
-- CORS enabled for the dashboard origin.
+- Namespace `platform`. Env URLs use `*.svc.cluster.local`.
+- `WEIGHT_A` is a weighted label only — presentation honesty required.
+- Demo: port-forward `gateway-api` or use dashboard `/api`.
 
 ### Dashboard
-- Poll `/health` (or gateway aggregate) every few seconds.
-- Show team owner, version, last check time, green/red.
-- Test-request panel: pick team, POST sample JSON, render prediction + endpoint name (proves isolation).
+- Poll gateway aggregate `/health` every few seconds.
+- Show owner, version, last check, green/red.
+- Test-request: `POST /predict/{team}` and show `endpoint` + `variant` in JSON.
+- In-cluster: nginx proxies `/api` → `gateway-api.platform.svc.cluster.local`.
 
-### Terraform
-- Files: `terraform/backend.tf` (commented if unused), `variables.tf`, `outputs.tf`, `eks_data.tf` (`data.aws_eks_cluster`), optional `k8s.tf`.
-- Document in README:
+### Terraform (PR #5)
+- Owns: namespaces, ConfigMaps, platform read Role/RoleBinding, remote state backend resources (bootstrap script).
+- Does not own: Deployments/Services/Secrets/quotas (kubectl/Actions), or the class cluster.
+- Lifecycle:
 
 ```text
+./scripts/bootstrap-tf-backend.sh   # once
 cd terraform
 terraform init
 terraform plan
 terraform apply
-terraform destroy   # destroys ONLY resources in this state, never the class cluster
+terraform destroy   # ONLY objects in this state
 ```
 
 ### Actions
 - `EKS_CLUSTER: k8s-training-cluster`
-- `docker/build-push-action` with `platforms: linux/amd64`
-- After apply: `kubectl rollout status` per deployment and a `kubectl get pods -n fraud,recommendations,forecasting`
+- `platforms: linux/amd64`
+- Verify: rollout status + `ENDPOINT_NAME` isolation + in-cluster curl jobs
 
 ### Docs graders will open
-- README: scenario, architecture (mermaid is fine), setup, deploy, verify curls, teardown.
-- History.md: every real failure + fix (already a good start).
-- `docs/architecture.md` if README gets long.
+- README first (must match reality).
+- History.md for failure narrative.
+- `docs/architecture.md` / presentation notes as needed.
 
 ---
 
@@ -189,5 +228,6 @@ terraform destroy   # destroys ONLY resources in this state, never the class clu
 2. Record failures and restores in History.md the same day.
 3. Talking-point comments in code are fine; do not novelize every YAML line.
 4. After a meaningful chunk, open or update a PR rather than stacking unbounded local commits.
-5. If AWS IAM blocks a bonus (S3 backend, extra endpoints), capture the error, mark bonus “blocked / documented”, and move on.
-6. Cursor on this Mac: follow https://cursor.com/docs for IDE operations. Use the `codeplatoon` profile in integrated terminals that talk to AWS.
+5. If AWS IAM blocks a bonus, capture the error, mark “blocked / documented”, and move on.
+6. Prefer `AWS_PROFILE=codeplatoon` in terminals that talk to AWS.
+7. Update this ground-truth section whenever `main` moves — do not leave stale “PR unmerged / dashboard is a shell” claims.
