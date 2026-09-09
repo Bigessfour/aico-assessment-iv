@@ -29,7 +29,13 @@ class FakeBody:
 
 
 class FakeSageMaker:
-    """Stand-in for the sagemaker-runtime client."""
+    """Stand-in for the sagemaker-runtime client.
+
+    Records every `invoke_endpoint` call so a test can assert which endpoint was
+    hit — that is how routing isolation is proven without AWS. Constructing it
+    with `error=` makes it raise instead, which is how the 502 failure path gets
+    tested: you cannot ask AWS to have an outage on demand, so it is simulated.
+    """
 
     def __init__(self, payload=None, error=None):
         self._payload = payload or {"score": 0.99}

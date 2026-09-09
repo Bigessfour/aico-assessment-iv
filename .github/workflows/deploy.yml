@@ -5,7 +5,7 @@
 # Builds team wrappers + platform gateway + ops-dashboard.
 # Branch targeting: workflow_dispatch input git_ref.
 # Post-deploy verify: scripts/verify.sh (same script graders run locally).
-# Chained workflows: chain-after-ci.yml runs after this workflow succeeds.
+# Chained workflows: chain-after-deploy.yml runs after this workflow succeeds.
 name: Build and Deploy
 
 on:

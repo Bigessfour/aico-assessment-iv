@@ -15,7 +15,14 @@ import { useCallback, useEffect, useState } from "react";
 
 const POLL_MS = 7000;
 
-/** Prefer same-origin /api when served from the dashboard nginx container. */
+/**
+ * Prefer same-origin /api when served from the dashboard nginx container.
+ *
+ * Why same-origin matters: a browser blocks JavaScript on one origin from
+ * calling a different origin unless the server opts in with CORS headers.
+ * Routing every call through this page's own /api path makes the gateway look
+ * like the same origin, so that whole class of bug disappears.
+ */
 const API_BASE = (import.meta.env.VITE_API_BASE || "/api").replace(/\/$/, "");
 
 const TEAMS = ["fraud", "recommendations", "forecasting"];
@@ -50,7 +57,10 @@ function App() {
     }
   }, []);
 
-  // Live polling — required UI feature #1
+  // Live polling — required UI feature #1.
+  // Fetch once on mount so the page is not blank, then every POLL_MS. The
+  // returned function is React's cleanup: it clears the interval when the
+  // component unmounts, otherwise timers would pile up on every re-render.
   useEffect(() => {
     refresh();
     const id = setInterval(refresh, POLL_MS);

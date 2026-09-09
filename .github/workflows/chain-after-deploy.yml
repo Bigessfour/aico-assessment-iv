@@ -3,6 +3,9 @@
 name: Chain after deploy
 
 on:
+  # workflow_run fires when the named workflow finishes, which is how one
+  # workflow chains to another. It reports completion regardless of outcome,
+  # so the job below filters on conclusion == 'success'.
   workflow_run:
     workflows: ["Build and Deploy"]
     types: [completed]
@@ -20,6 +23,8 @@ jobs:
     if: github.event.workflow_run.conclusion == 'success'
     runs-on: ubuntu-latest
     steps:
+      # Check out the exact commit that was deployed, not whatever main points
+      # at now — otherwise a merge landing mid-deploy would verify the wrong code.
       - uses: actions/checkout@v4
         with:
           ref: ${{ github.event.workflow_run.head_sha }}
