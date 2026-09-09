@@ -1,10 +1,10 @@
-# Bonus: chain workflows — after CI succeeds on main, re-verify live pods.
-# Does not rebuild images (avoids double GHCR cost when path-filtered deploy also runs).
-name: Chain after CI
+# Bonus: chain workflows — after Build and Deploy succeeds, re-run verify.
+# Does not rebuild images. Avoids verifying on README-only CI pushes.
+name: Chain after deploy
 
 on:
   workflow_run:
-    workflows: ["CI"]
+    workflows: ["Build and Deploy"]
     types: [completed]
 
 env:
@@ -16,11 +16,8 @@ permissions:
 
 jobs:
   verify-live:
-    name: Post-CI cluster verify
-    if: |
-      github.event.workflow_run.conclusion == 'success' &&
-      github.event.workflow_run.head_branch == 'main' &&
-      github.event.workflow_run.event == 'push'
+    name: Post-deploy cluster verify
+    if: github.event.workflow_run.conclusion == 'success'
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4

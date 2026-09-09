@@ -4,7 +4,8 @@
 #
 # Builds team wrappers + platform gateway + ops-dashboard.
 # Branch targeting: workflow_dispatch input git_ref.
-# Chained workflows: see chain-after-ci.yml (CI success → in-cluster verify).
+# Post-deploy verify: scripts/verify.sh (same script graders run locally).
+# Chained workflows: chain-after-ci.yml runs after this workflow succeeds.
 name: Build and Deploy
 
 on:
@@ -162,15 +163,31 @@ jobs:
             --region "${AWS_REGION}" \
             --name "${EKS_CLUSTER}"
 
-      - name: Resolve team list
+      - name: Resolve team list (allowlist)
         id: teams
         run: |
+          set -euo pipefail
+          ALLOWED="fraud recommendations forecasting"
           TEAMS="${{ github.event.inputs.teams }}"
           if [ -z "$TEAMS" ]; then
             TEAMS="fraud,recommendations,forecasting"
           fi
-          echo "list=$TEAMS" >> "$GITHUB_OUTPUT"
-          echo "Deploying teams: $TEAMS"
+          OUT=""
+          IFS=',' read -ra RAW <<< "$TEAMS"
+          for team in "${RAW[@]}"; do
+            team="$(echo "$team" | xargs)"
+            case " $ALLOWED " in
+              *" $team "*) ;;
+              *)
+                echo "Refusing unknown team '$team' (allowlist: $ALLOWED)"
+                exit 1
+                ;;
+            esac
+            if [ -n "$OUT" ]; then OUT="${OUT},"; fi
+            OUT="${OUT}${team}"
+          done
+          echo "list=$OUT" >> "$GITHUB_OUTPUT"
+          echo "Deploying teams: $OUT"
 
       - name: Ensure namespace secrets (AWS + GHCR pull)
         env:
@@ -181,7 +198,6 @@ jobs:
           set -euo pipefail
           IFS=',' read -ra TEAM_ARR <<< "${{ steps.teams.outputs.list }}"
           for team in "${TEAM_ARR[@]}"; do
-            team="$(echo "$team" | xargs)"
             kubectl apply -f "k8s/${team}/namespace.yml"
 
             kubectl -n "$team" create secret generic "${team}-aws-creds" \
@@ -209,8 +225,8 @@ jobs:
           set -euo pipefail
           IFS=',' read -ra TEAM_ARR <<< "${{ steps.teams.outputs.list }}"
           for team in "${TEAM_ARR[@]}"; do
-            team="$(echo "$team" | xargs)"
             echo "=== apply $team ==="
+            # ConfigMaps owned here (not Terraform) — single writer with demo-failure.sh
             kubectl apply -f "k8s/${team}/namespace.yml"
             kubectl apply -f "k8s/${team}/quota.yml"
             kubectl apply -f "k8s/${team}/configmap.yml"
@@ -237,7 +253,6 @@ jobs:
           )
           IFS=',' read -ra TEAM_ARR <<< "${{ steps.teams.outputs.list }}"
           for team in "${TEAM_ARR[@]}"; do
-            team="$(echo "$team" | xargs)"
             image="${REGISTRY}/${IMAGE_OWNER}/${IMG[$team]}:${SHA}"
             kubectl -n "$team" set image "deployment/${team}-api" "${team}-api=${image}"
           done
@@ -252,7 +267,6 @@ jobs:
           set -euo pipefail
           IFS=',' read -ra TEAM_ARR <<< "${{ steps.teams.outputs.list }}"
           for team in "${TEAM_ARR[@]}"; do
-            team="$(echo "$team" | xargs)"
             echo "=== rollout $team ==="
             kubectl -n "$team" rollout status "deployment/${team}-api" --timeout=180s
             kubectl -n "$team" get pods,svc
@@ -262,43 +276,7 @@ jobs:
           kubectl -n platform rollout status deployment/ops-dashboard --timeout=180s
           kubectl -n platform get pods,svc
 
-      - name: Verify ENDPOINT_NAME routing isolation
+      - name: Verify isolation + health via scripts/verify.sh
         run: |
-          set -euo pipefail
-          expect_fraud=aico-iv-fraud
-          expect_recommendations=aico-iv-recs
-          expect_forecasting=aico-iv-forecast
-
-          IFS=',' read -ra TEAM_ARR <<< "${{ steps.teams.outputs.list }}"
-          for team in "${TEAM_ARR[@]}"; do
-            team="$(echo "$team" | xargs)"
-            var="expect_${team}"
-            expected="${!var}"
-            actual="$(kubectl -n "$team" exec "deploy/${team}-api" -- \
-              python -c 'import os; print(os.environ.get("ENDPOINT_NAME",""))')"
-            echo "$team ENDPOINT_NAME=$actual (expected $expected)"
-            test "$actual" = "$expected"
-          done
-
-      - name: Verify /health and /ready via in-cluster curl Job
-        run: |
-          set -euo pipefail
-          IFS=',' read -ra TEAM_ARR <<< "${{ steps.teams.outputs.list }}"
-          for team in "${TEAM_ARR[@]}"; do
-            team="$(echo "$team" | xargs)"
-            echo "=== health $team ==="
-            kubectl -n "$team" run "healthcheck-${team}-${{ github.run_id }}" \
-              --image=curlimages/curl:8.5.0 \
-              --restart=Never \
-              --rm -i \
-              --command -- \
-              sh -c "curl -sf http://${team}-api.${team}.svc.cluster.local/health && echo && curl -sf http://${team}-api.${team}.svc.cluster.local/ready && echo"
-          done
-
-          echo "=== health gateway ==="
-          kubectl -n platform run "healthcheck-gateway-${{ github.run_id }}" \
-            --image=curlimages/curl:8.5.0 \
-            --restart=Never \
-            --rm -i \
-            --command -- \
-            sh -c "curl -sf http://gateway-api.platform.svc.cluster.local/health && echo && curl -sf http://gateway-api.platform.svc.cluster.local/ready && echo"
+          chmod +x scripts/verify.sh
+          TEAMS="${{ steps.teams.outputs.list }}" ./scripts/verify.sh

@@ -29,16 +29,11 @@ output "managed_namespaces" {
 }
 
 output "team_endpoints" {
-  description = "SageMaker endpoint names wired via ConfigMaps (routing isolation)."
+  description = "Intended SageMaker endpoint names (wired at deploy via k8s ConfigMaps)."
   value       = { for k, v in var.teams : k => v.endpoint }
-}
-
-output "gateway_weight_a" {
-  description = "Current A/B weight for gateway variant A."
-  value       = var.gateway_weight_a
 }
 
 output "teardown_note" {
   description = "Reminder for destroy scope."
-  value       = "terraform destroy removes ONLY namespaces/ConfigMaps/RBAC in this state — never the class EKS cluster."
+  value       = "terraform destroy removes ONLY namespaces/RBAC in this state — never the class EKS cluster. ConfigMaps/Deployments are Actions/YAML-owned."
 }

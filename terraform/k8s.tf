@@ -1,9 +1,12 @@
 # =============================================================================
 # Kubernetes objects managed by Terraform (bonus: Kubernetes provider)
 # =============================================================================
-# Ownership boundary:
-#   Terraform → Namespace, ConfigMap, platform Role/RoleBinding
-#   kubectl YAML / Actions → Deployments, Services, Secrets, ResourceQuota
+# Ownership boundary (single owner — no dual-write):
+#   Terraform → Namespace, platform Role/RoleBinding
+#   kubectl YAML / Actions → ConfigMaps, Deployments, Services, Secrets, quotas
+#
+# ConfigMaps (ENDPOINT_NAME, WEIGHT_A) live in k8s/*/configmap.yml so deploy and
+# demo-failure.sh are the only writers. Do not re-add kubernetes_config_map here.
 #
 # If namespaces already exist from earlier kubectl apply, import them once:
 #   terraform import 'kubernetes_namespace.team["fraud"]' fraud
@@ -19,16 +22,11 @@ resource "kubernetes_namespace" "team" {
   metadata {
     name = each.key
     labels = {
-      team                              = each.key
-      "app.kubernetes.io/part-of"       = "ml-platform"
-      "app.kubernetes.io/managed-by"    = "terraform"
-      owner                             = replace(each.value.owner, " ", "-")
+      team                           = each.key
+      "app.kubernetes.io/part-of"    = "ml-platform"
+      "app.kubernetes.io/managed-by" = "terraform"
+      owner                          = replace(each.value.owner, " ", "-")
     }
-  }
-
-  # Soft guard: prefer import over accidental delete of a live team namespace mid-demo.
-  lifecycle {
-    prevent_destroy = false
   }
 }
 
@@ -41,49 +39,6 @@ resource "kubernetes_namespace" "platform" {
       "app.kubernetes.io/part-of"    = "ml-platform"
       "app.kubernetes.io/managed-by" = "terraform"
     }
-  }
-}
-
-# --- Per-team ConfigMaps (ENDPOINT_NAME routing isolation) ---
-# Deployments still use envFrom → these keys; keep names stable.
-resource "kubernetes_config_map" "team" {
-  for_each = var.teams
-
-  metadata {
-    name      = "${each.key}-config"
-    namespace = kubernetes_namespace.team[each.key].metadata[0].name
-    labels = {
-      team                           = each.key
-      "app.kubernetes.io/managed-by" = "terraform"
-    }
-  }
-
-  data = {
-    ENDPOINT_NAME           = each.value.endpoint
-    AWS_REGION              = var.aws_region
-    LOG_LEVEL               = "info"
-    INVOKE_TIMEOUT_SECONDS  = "10"
-  }
-}
-
-# --- Gateway ConfigMap (in-cluster DNS + A/B weight) ---
-resource "kubernetes_config_map" "gateway" {
-  metadata {
-    name      = "gateway-config"
-    namespace = kubernetes_namespace.platform.metadata[0].name
-    labels = {
-      team                           = "platform"
-      "app.kubernetes.io/managed-by" = "terraform"
-    }
-  }
-
-  data = {
-    FRAUD_URL               = "http://fraud-api.fraud.svc.cluster.local"
-    RECOMMENDATIONS_URL     = "http://recommendations-api.recommendations.svc.cluster.local"
-    FORECASTING_URL         = "http://forecasting-api.forecasting.svc.cluster.local"
-    WEIGHT_A                = var.gateway_weight_a
-    HTTP_TIMEOUT_SECONDS    = "15"
-    CORS_ORIGINS            = "*"
   }
 }
 
