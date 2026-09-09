@@ -1,0 +1,17 @@
+# Keep the build context small and correct.
+#
+# node_modules is the important one: the Dockerfile runs `npm ci` inside the
+# image, then `COPY . ./`. Without this file a local build on macOS would copy
+# the host's node_modules on top of the ones just installed for Linux, which
+# breaks any dependency with a compiled binary. CI never hits this because a
+# fresh checkout has no node_modules — exactly the kind of bug that only
+# appears on a laptop.
+node_modules
+dist
+.vite
+
+# Never needed inside the image.
+.git
+.gitignore
+Dockerfile
+.dockerignore

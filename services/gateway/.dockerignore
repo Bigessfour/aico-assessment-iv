@@ -1,0 +1,15 @@
+# Keep the build context small so `COPY . .` only ships what runs.
+#
+# Python bytecode caches are host-specific and get regenerated anyway; shipping
+# them just makes the image bigger and the layer cache noisier.
+__pycache__/
+*.py[cod]
+.pytest_cache/
+.venv/
+venv/
+
+# Never needed inside the image.
+.git
+.gitignore
+Dockerfile
+.dockerignore
