@@ -86,7 +86,7 @@ k8s/
   ci.yml                # PR/main: Python syntax + manifest presence
   deploy.yml            # main: matrix build → GHCR → EKS apply → verify
 terraform/              # namespaces, ConfigMaps, platform RBAC + remote state
-scripts/                # helpers (e.g. TF backend bootstrap when present)
+scripts/                # verify.sh, demo-failure.sh, bootstrap-tf-backend.sh
 History.md              # issues hit + fixes
 getting_started.md      # original upstream bootstrap notes
 ```
@@ -171,6 +171,19 @@ kubectl -n platform port-forward svc/ops-dashboard 3000:80
 ```
 
 The UI live-polls gateway `/health` (via nginx `/api`), shows owner/version/endpoint, and can `POST /predict/{team}` to prove routing.
+
+---
+
+## Verify + controlled failure demos
+
+```bash
+export AWS_PROFILE=codeplatoon
+./scripts/verify.sh                 # Deployments, ENDPOINT_NAME isolation, in-cluster /health+/ready
+./scripts/demo-failure.sh quota     # ResourceQuota rejects 5th fraud pod; always restores
+./scripts/demo-failure.sh ready     # empty ENDPOINT_NAME → Ready=False + /ready 503; always restores
+```
+
+Both demos use an EXIT trap to restore replicas and `ENDPOINT_NAME`. Evidence: [History.md](History.md).
 
 ---
 

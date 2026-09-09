@@ -200,8 +200,30 @@ Replaced the starter README with grader-facing docs: Scenario 1, mermaid archite
 
 Deprecation note: Terraform warns `dynamodb_table` → prefer `use_lockfile` later; DynamoDB lock still works for the rubric.
 
+## Controlled failure + verify scripts (2026-09-08)
+
+Merged via PR path `feature/failure-demo-scripts`. Evidence captured against live `k8s-training-cluster`:
+
+### `scripts/verify.sh`
+- Confirmed namespaces + Deployments Ready
+- ConfigMap isolation: fraud→`aico-iv-fraud`, recommendations→`aico-iv-recs`, forecasting→`aico-iv-forecast`
+- In-cluster curl pods: `/health` + `/ready` OK for three teams + gateway (`VERIFY OK`)
+
+### `scripts/demo-failure.sh quota`
+- Scaled `fraud-api` 1→5 with ResourceQuota `pods=4`
+- Events: `FailedCreate ... exceeded quota: fraud-quota, requested: pods=1, used: pods=4, limited: pods=4`
+- EXIT trap scaled back to 1 + rollout OK
+
+### `scripts/demo-failure.sh ready`
+- Cleared `fraud-config` `ENDPOINT_NAME`, scaled through 0→1
+- New pod `Ready=False` / `ContainersNotReady`
+- Direct pod curl: `http=503` `{"status":"not ready","error":"ENDPOINT_NAME not set"}`
+- EndpointSlice showed `ready: false`
+- EXIT trap restored `ENDPOINT_NAME=aico-iv-fraud` and healthy Ready pod
+
+Lesson: a wrong-but-nonempty `ENDPOINT_NAME` still passes `/ready` (client constructable). Empty string is the clean readiness gate for this demo. Quota rejection surfaces as admission `FailedCreate`, not always a Pending pod.
+
 ## Still to do (platform)
 
-- Controlled failure demo script + verify helper
 - Actions bonuses (rollback, branch targeting, lint/destroy-workloads)
 - Presentation notes + leftover branch cleanup
