@@ -24,18 +24,12 @@ variable "cluster_name" {
   default     = "k8s-training-cluster"
 }
 
-variable "gateway_weight_a" {
-  type        = string
-  description = "A/B weight for gateway variant A (0-100). Managed in ConfigMap."
-  default     = "80"
-}
-
 variable "teams" {
   type = map(object({
     endpoint = string
     owner    = string
   }))
-  description = "Team namespaces → SageMaker endpoint names (routing isolation)."
+  description = "Team namespaces → SageMaker endpoint names (routing isolation catalog)."
   default = {
     fraud = {
       endpoint = "aico-iv-fraud"

@@ -10,6 +10,7 @@ Talking points (presentation / rubric bonus):
 
 from __future__ import annotations
 
+import asyncio
 import os
 import random
 from typing import Any
@@ -63,36 +64,42 @@ def pick_variant() -> str:
     return "A" if random.randint(1, 100) <= WEIGHT_A else "B"
 
 
+async def _team_health(client: httpx.AsyncClient, team: str, base: str) -> tuple[str, dict[str, Any]]:
+    """Fetch one team's /health; never raises — errors become unhealthy entries."""
+    try:
+        resp = await client.get(f"{base.rstrip('/')}/health")
+        body = resp.json() if resp.status_code < 500 else {"status": "error"}
+        return team, {
+            "owner": TEAM_OWNERS[team],
+            "http_status": resp.status_code,
+            "healthy": resp.status_code == 200 and body.get("status") == "healthy",
+            "version": body.get("version", "unknown"),
+            "endpoint": body.get("endpoint", ""),
+            "raw": body,
+        }
+    except Exception as exc:  # noqa: BLE001 — surface any connect error to UI
+        return team, {
+            "owner": TEAM_OWNERS[team],
+            "http_status": 0,
+            "healthy": False,
+            "version": "unknown",
+            "endpoint": "",
+            "error": str(exc),
+        }
+
+
 @app.get("/health")
 async def health() -> dict[str, Any]:
     """Aggregate team health for the dashboard (live polling target).
 
     Gateway itself is always 'up' if this handler runs; each team entry
-    may be healthy / unreachable independently.
+    may be healthy / unreachable independently. Team probes run in parallel.
     """
-    teams: dict[str, Any] = {}
     async with httpx.AsyncClient(timeout=HTTP_TIMEOUT) as client:
-        for team, base in TEAM_URLS.items():
-            try:
-                resp = await client.get(f"{base.rstrip('/')}/health")
-                body = resp.json() if resp.status_code < 500 else {"status": "error"}
-                teams[team] = {
-                    "owner": TEAM_OWNERS[team],
-                    "http_status": resp.status_code,
-                    "healthy": resp.status_code == 200 and body.get("status") == "healthy",
-                    "version": body.get("version", "unknown"),
-                    "endpoint": body.get("endpoint", ""),
-                    "raw": body,
-                }
-            except Exception as exc:  # noqa: BLE001 — surface any connect error to UI
-                teams[team] = {
-                    "owner": TEAM_OWNERS[team],
-                    "http_status": 0,
-                    "healthy": False,
-                    "version": "unknown",
-                    "endpoint": "",
-                    "error": str(exc),
-                }
+        pairs = await asyncio.gather(
+            *[_team_health(client, team, base) for team, base in TEAM_URLS.items()]
+        )
+    teams = dict(pairs)
 
     all_healthy = all(t.get("healthy") for t in teams.values()) if teams else False
     return {

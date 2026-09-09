@@ -50,7 +50,7 @@ Latest **CI** and **Build and Deploy** on `main` succeeded ([deploy run](https:/
 | Slice | Status | Notes |
 |-------|--------|-------|
 | Controlled failure demo | **Done** | `scripts/demo-failure.sh` + `verify.sh`; History evidence; always restore |
-| Actions bonuses | **This PR** | rollback, lint, destroy-workloads, chain-after-ci, deploy `git_ref` |
+| Actions bonuses | **Done** | rollback, lint, destroy-workloads, chain-after-deploy, deploy `git_ref` |
 | Presentation notes | **Done** | `docs/presentation-notes.md` |
 | Leftover remote branches | Cleanup | Delete merged feature branch leftovers |
 
@@ -160,7 +160,8 @@ If you presented tomorrow as-is: live platform + README carry **K8s / SageMaker 
 - [x] React ops UI + Tailwind styling + live poll + version + test-predict
 - [x] Terraform remote state S3 + DynamoDB lock + K8s provider (ns/ConfigMaps/RBAC)
 - [x] `scripts/verify.sh` + `scripts/demo-failure.sh` (quota + ready) with History.md evidence + restore
-- [x] Actions: rollback, lint dry-run, namespaced destroy, `workflow_run` chain, `git_ref` targeting
+- [x] Actions: rollback, lint dry-run, namespaced destroy, deploy→verify chain, `git_ref` targeting
+- [x] Code-review cleanup: ConfigMap single owner, deploy→verify.sh, drop example seed
 
 ---
 
@@ -194,8 +195,8 @@ Remote state: S3 `aico-iv-steve-tfstate`, DynamoDB `aico-iv-steve-tflock`. K8s p
 - In-cluster: nginx proxies `/api` → `gateway-api.platform.svc.cluster.local`.
 
 ### Terraform (PR #5)
-- Owns: namespaces, ConfigMaps, platform read Role/RoleBinding, remote state backend resources (bootstrap script).
-- Does not own: Deployments/Services/Secrets/quotas (kubectl/Actions), or the class cluster.
+- Owns: namespaces, platform read Role/RoleBinding, remote state backend resources (bootstrap script).
+- Does not own: ConfigMaps (YAML/Actions), Deployments/Services/Secrets/quotas, or the class cluster.
 - Lifecycle:
 
 ```text

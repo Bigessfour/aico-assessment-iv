@@ -228,13 +228,24 @@ Lesson: a wrong-but-nonempty `ENDPOINT_NAME` still passes `/ready` (client const
 - `lint-manifests.yml` — `kubectl apply --dry-run=client` for all team + platform manifests
 - `rollback.yml` — `workflow_dispatch` rollout undo (optional revision)
 - `destroy-workloads.yml` — deletes only `fraud` / `recommendations` / `forecasting` / `platform` after confirm phrase `destroy-my-workloads` (never the class EKS cluster)
-- `chain-after-ci.yml` — `workflow_run` after successful CI push to `main` runs `scripts/verify.sh`
+- `chain-after-deploy.yml` — `workflow_run` after **Build and Deploy** success runs `scripts/verify.sh`
 - `deploy.yml` — `git_ref` input for branch/SHA targeting on manual runs
 
 ## Presentation notes (2026-09-08)
 
 Added `docs/presentation-notes.md` — demo order, Q&A honesty on A/B, rubric map.
 
+## Code-review cleanup (2026-09-08)
+
+Addressed structural review findings:
+
+- Deploy calls `scripts/verify.sh` (deleted duplicated isolation/curl Job steps); team input allowlisted
+- ConfigMaps: **Actions/YAML only** — removed `kubernetes_config_map` from Terraform (namespaces + RBAC remain). State-rm recipe in `terraform/README.md`
+- Deleted seed `services/example` + `k8s/example`
+- Renamed/retargeted chain workflow: runs after **Build and Deploy** success (not every CI docs push)
+- `demo-failure.sh` restore is mode-specific (quota vs ready)
+
 ## Still to do (platform)
+
 
 - Optional leftover remote branch cleanup

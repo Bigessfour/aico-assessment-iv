@@ -5,7 +5,7 @@ Talking points (presentation):
   - Platform eng wraps each team's endpoint in FastAPI so callers and
     Kubernetes get the same contract: /health, /ready, /predict.
   - This service is owned by the Recommendations team; ENDPOINT_NAME must point at
-    aico-iv-recs (not recs/forecast) so routing stays correct.
+    aico-iv-recs (not fraud/forecast) so routing stays correct.
 """
 
 from fastapi import FastAPI, HTTPException

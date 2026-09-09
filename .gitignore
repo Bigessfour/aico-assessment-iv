@@ -15,3 +15,4 @@ venv/
 k8s/**/secret.yml
 k8s/**/secret.yaml
 **/ghcr-secret.yml
+.DS_Store

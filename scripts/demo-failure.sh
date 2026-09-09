@@ -31,14 +31,27 @@ usage() {
 
 restore() {
   echo
-  echo "== RESTORE (trap) =="
-  kubectl -n "$NS" patch "configmap/$CM" --type merge \
-    -p "{\"data\":{\"ENDPOINT_NAME\":\"$GOOD_ENDPOINT\"}}" >/dev/null 2>&1 || true
-  kubectl -n "$NS" scale "deploy/$DEPLOY" --replicas="$ORIG_REPLICAS" >/dev/null 2>&1 || true
-  kubectl -n "$NS" rollout restart "deploy/$DEPLOY" >/dev/null 2>&1 || true
-  kubectl -n "$NS" rollout status "deploy/$DEPLOY" --timeout=180s || true
+  echo "== RESTORE (trap) mode=$MODE =="
+  case "$MODE" in
+    quota)
+      kubectl -n "$NS" scale "deploy/$DEPLOY" --replicas="$ORIG_REPLICAS" >/dev/null 2>&1 || true
+      kubectl -n "$NS" rollout status "deploy/$DEPLOY" --timeout=180s || true
+      ;;
+    ready)
+      kubectl -n "$NS" patch "configmap/$CM" --type merge \
+        -p "{\"data\":{\"ENDPOINT_NAME\":\"$GOOD_ENDPOINT\"}}" >/dev/null 2>&1 || true
+      kubectl -n "$NS" scale "deploy/$DEPLOY" --replicas="$ORIG_REPLICAS" >/dev/null 2>&1 || true
+      kubectl -n "$NS" rollout restart "deploy/$DEPLOY" >/dev/null 2>&1 || true
+      kubectl -n "$NS" rollout status "deploy/$DEPLOY" --timeout=180s || true
+      ;;
+    *)
+      kubectl -n "$NS" patch "configmap/$CM" --type merge \
+        -p "{\"data\":{\"ENDPOINT_NAME\":\"$GOOD_ENDPOINT\"}}" >/dev/null 2>&1 || true
+      kubectl -n "$NS" scale "deploy/$DEPLOY" --replicas="$ORIG_REPLICAS" >/dev/null 2>&1 || true
+      ;;
+  esac
   kubectl -n "$NS" get pods
-  echo "Restore attempted: replicas=$ORIG_REPLICAS ENDPOINT_NAME=$GOOD_ENDPOINT"
+  echo "Restore attempted for mode=$MODE (replicas=$ORIG_REPLICAS ENDPOINT_NAME=$GOOD_ENDPOINT)"
 }
 trap restore EXIT
 

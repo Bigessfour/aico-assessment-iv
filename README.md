@@ -88,8 +88,8 @@ k8s/
   lint-manifests.yml    # dry-run client
   rollback.yml          # rollout undo
   destroy-workloads.yml # our namespaces only
-  chain-after-ci.yml    # workflow_run → verify.sh
-terraform/              # namespaces, ConfigMaps, platform RBAC + remote state
+  chain-after-deploy.yml # after Build and Deploy → verify.sh
+terraform/              # namespaces + platform RBAC + remote state (not ConfigMaps)
 scripts/                # verify.sh, demo-failure.sh, bootstrap-tf-backend.sh
 History.md              # issues hit + fixes
 getting_started.md      # original upstream bootstrap notes
@@ -133,10 +133,10 @@ The workflow:
 
 | Workflow | Purpose |
 |----------|---------|
+| **Chain after deploy** | After **Build and Deploy** succeeds, runs `scripts/verify.sh` again |
 | **Lint manifests** | `kubectl apply --dry-run=client` on PRs touching `k8s/` |
 | **Rollback** | `rollout undo` for teams / platform (optional revision) |
 | **Destroy workloads** | Deletes only our four namespaces after confirm `destroy-my-workloads` |
-| **Chain after CI** | On successful CI push to `main`, runs `scripts/verify.sh` |
 
 Never use Destroy against the shared EKS cluster itself.
 
@@ -204,7 +204,7 @@ Both demos use an EXIT trap to restore replicas and `ENDPOINT_NAME`. Evidence: [
 
 ## Terraform
 
-**Do not** `terraform destroy` the class EKS cluster. This stack only manages **our** namespaces, ConfigMaps, and platform RBAC, plus remote state (S3 + DynamoDB). The cluster is a data source only.
+**Do not** `terraform destroy` the class EKS cluster. This stack only manages **our** namespaces and platform RBAC, plus remote state (S3 + DynamoDB). ConfigMaps are Actions/YAML-owned. The cluster is a data source only.
 
 ```bash
 export AWS_PROFILE=codeplatoon
@@ -216,7 +216,7 @@ terraform apply
 terraform destroy   # ONLY resources in this state
 ```
 
-Details and import notes: [terraform/README.md](terraform/README.md).
+Details and import notes: [terraform/README.md](terraform/README.md). Terraform owns **namespaces + platform RBAC** only; ConfigMaps are applied by Actions/YAML (single writer).
 
 ---
 
