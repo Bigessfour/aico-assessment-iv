@@ -1,0 +1,75 @@
+# Rollback Deployments to the previous ReplicaSet (or a chosen revision).
+# Manual only — does not rebuild images.
+name: Rollback
+
+on:
+  workflow_dispatch:
+    inputs:
+      scope:
+        description: "Comma-separated teams and/or platform (default: all teams + platform)"
+        required: false
+        default: "fraud,recommendations,forecasting,platform"
+      revision:
+        description: "Optional rollout revision number (empty = previous)"
+        required: false
+        default: ""
+
+env:
+  AWS_REGION: us-east-1
+  EKS_CLUSTER: k8s-training-cluster
+
+permissions:
+  contents: read
+
+jobs:
+  rollback:
+    name: Rollout undo
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region: ${{ env.AWS_REGION }}
+
+      - name: Install kubectl
+        uses: azure/setup-kubectl@v4
+        with:
+          version: "v1.30.0"
+
+      - name: Update kubeconfig
+        run: |
+          aws eks update-kubeconfig \
+            --region "${AWS_REGION}" \
+            --name "${EKS_CLUSTER}"
+
+      - name: Rollout undo
+        run: |
+          set -euo pipefail
+          SCOPE="${{ github.event.inputs.scope }}"
+          REV="${{ github.event.inputs.revision }}"
+          IFS=',' read -ra ITEMS <<< "$SCOPE"
+          for item in "${ITEMS[@]}"; do
+            item="$(echo "$item" | xargs)"
+            if [ "$item" = "platform" ]; then
+              deploys=(gateway-api ops-dashboard)
+              ns=platform
+            else
+              deploys=("${item}-api")
+              ns="$item"
+            fi
+            for d in "${deploys[@]}"; do
+              echo "=== undo $ns/$d ==="
+              if [ -n "$REV" ]; then
+                kubectl -n "$ns" rollout undo "deployment/$d" --to-revision="$REV"
+              else
+                kubectl -n "$ns" rollout undo "deployment/$d"
+              fi
+              kubectl -n "$ns" rollout status "deployment/$d" --timeout=180s
+              kubectl -n "$ns" get pods -l "app=$d"
+            done
+          done
+          echo "ROLLBACK OK"

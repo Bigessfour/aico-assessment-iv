@@ -223,7 +223,14 @@ Merged via PR path `feature/failure-demo-scripts`. Evidence captured against liv
 
 Lesson: a wrong-but-nonempty `ENDPOINT_NAME` still passes `/ready` (client constructable). Empty string is the clean readiness gate for this demo. Quota rejection surfaces as admission `FailedCreate`, not always a Pending pod.
 
+## Actions bonuses (2026-09-08)
+
+- `lint-manifests.yml` — `kubectl apply --dry-run=client` for all team + platform manifests
+- `rollback.yml` — `workflow_dispatch` rollout undo (optional revision)
+- `destroy-workloads.yml` — deletes only `fraud` / `recommendations` / `forecasting` / `platform` after confirm phrase `destroy-my-workloads` (never the class EKS cluster)
+- `chain-after-ci.yml` — `workflow_run` after successful CI push to `main` runs `scripts/verify.sh`
+- `deploy.yml` — `git_ref` input for branch/SHA targeting on manual runs
+
 ## Still to do (platform)
 
-- Actions bonuses (rollback, branch targeting, lint/destroy-workloads)
 - Presentation notes + leftover branch cleanup

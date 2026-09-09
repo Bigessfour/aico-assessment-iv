@@ -1,0 +1,59 @@
+# Destroy ONLY our Assessment IV namespaces on the shared class cluster.
+# Does NOT touch EKS, VPC, other students' namespaces, or SageMaker endpoints.
+name: Destroy workloads
+
+on:
+  workflow_dispatch:
+    inputs:
+      confirm:
+        description: 'Type exactly: destroy-my-workloads'
+        required: true
+        default: ""
+
+env:
+  AWS_REGION: us-east-1
+  EKS_CLUSTER: k8s-training-cluster
+
+permissions:
+  contents: read
+
+jobs:
+  destroy:
+    name: Delete our namespaces
+    runs-on: ubuntu-latest
+    steps:
+      - name: Confirm phrase
+        run: |
+          if [ "${{ github.event.inputs.confirm }}" != "destroy-my-workloads" ]; then
+            echo "Refusing: confirm must be exactly destroy-my-workloads"
+            exit 1
+          fi
+
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region: ${{ env.AWS_REGION }}
+
+      - name: Install kubectl
+        uses: azure/setup-kubectl@v4
+        with:
+          version: "v1.30.0"
+
+      - name: Update kubeconfig
+        run: |
+          aws eks update-kubeconfig \
+            --region "${AWS_REGION}" \
+            --name "${EKS_CLUSTER}"
+
+      - name: Delete namespaces fraud recommendations forecasting platform
+        run: |
+          set -euo pipefail
+          # Hard allowlist — never interpolate free-form names here.
+          for ns in fraud recommendations forecasting platform; do
+            echo "Deleting namespace $ns (if present)"
+            kubectl delete namespace "$ns" --wait=false --ignore-not-found
+          done
+          echo "Destroy requested. Cluster $EKS_CLUSTER left intact."
+          kubectl get ns fraud recommendations forecasting platform || true
