@@ -1,6 +1,8 @@
 # Required CI/CD path: build → GHCR → EKS apply → verify.
 # Does NOT create/destroy the class EKS cluster.
 # Secrets are created from GitHub Actions secrets (never from secret.example.yml).
+#
+# Builds team wrappers + platform gateway + ops-dashboard.
 name: Build and Deploy
 
 on:
@@ -8,6 +10,7 @@ on:
     branches: [main]
     paths:
       - "services/**"
+      - "dashboard/**"
       - "k8s/**"
       - ".github/workflows/deploy.yml"
   workflow_dispatch:
@@ -35,12 +38,17 @@ jobs:
       fail-fast: false
       matrix:
         include:
+          # context differs for dashboard/ vs services/
           - service: fraud-detection
-            team: fraud
+            context: services/fraud-detection
           - service: recommendations
-            team: recommendations
+            context: services/recommendations
           - service: forecasting
-            team: forecasting
+            context: services/forecasting
+          - service: gateway
+            context: services/gateway
+          - service: ops-dashboard
+            context: dashboard
     steps:
       - uses: actions/checkout@v4
 
@@ -60,7 +68,7 @@ jobs:
       - name: Build and push linux/amd64
         uses: docker/build-push-action@v6
         with:
-          context: services/${{ matrix.service }}
+          context: ${{ matrix.context }}
           platforms: linux/amd64
           push: true
           tags: |
@@ -128,6 +136,14 @@ jobs:
               --dry-run=client -o yaml | kubectl apply -f -
           done
 
+          # platform: GHCR pull only (gateway does not call SageMaker directly)
+          kubectl apply -f k8s/platform/namespace.yml
+          kubectl -n platform create secret docker-registry ghcr-secret \
+            --docker-server=ghcr.io \
+            --docker-username="${{ github.actor }}" \
+            --docker-password="${GHCR_TOKEN}" \
+            --dry-run=client -o yaml | kubectl apply -f -
+
       - name: Apply manifests (skip secret.example.yml)
         run: |
           set -euo pipefail
@@ -142,10 +158,17 @@ jobs:
             kubectl apply -f "k8s/${team}/service.yml"
           done
 
+          echo "=== apply platform (gateway + dashboard) ==="
+          kubectl apply -f k8s/platform/namespace.yml
+          kubectl apply -f k8s/platform/quota.yml
+          kubectl apply -f k8s/platform/configmap.yml
+          kubectl apply -f k8s/platform/deployment-gateway.yml
+          kubectl apply -f k8s/platform/service-gateway.yml
+          kubectl apply -f k8s/platform/dashboard.yml
+
       - name: Pin deployments to this commit's image digest tag
         run: |
           set -euo pipefail
-          # Map team → image repo name
           declare -A IMG=(
             [fraud]=fraud-detection
             [recommendations]=recommendations
@@ -158,6 +181,11 @@ jobs:
             kubectl -n "$team" set image "deployment/${team}-api" "${team}-api=${image}"
           done
 
+          kubectl -n platform set image deployment/gateway-api \
+            "gateway-api=${REGISTRY}/${IMAGE_OWNER}/gateway:${{ github.sha }}"
+          kubectl -n platform set image deployment/ops-dashboard \
+            "ops-dashboard=${REGISTRY}/${IMAGE_OWNER}/ops-dashboard:${{ github.sha }}"
+
       - name: Verify rollouts
         run: |
           set -euo pipefail
@@ -168,6 +196,10 @@ jobs:
             kubectl -n "$team" rollout status "deployment/${team}-api" --timeout=180s
             kubectl -n "$team" get pods,svc
           done
+          echo "=== rollout platform ==="
+          kubectl -n platform rollout status deployment/gateway-api --timeout=180s
+          kubectl -n platform rollout status deployment/ops-dashboard --timeout=180s
+          kubectl -n platform get pods,svc
 
       - name: Verify ENDPOINT_NAME routing isolation
         run: |
@@ -201,3 +233,11 @@ jobs:
               --command -- \
               sh -c "curl -sf http://${team}-api.${team}.svc.cluster.local/health && echo && curl -sf http://${team}-api.${team}.svc.cluster.local/ready && echo"
           done
+
+          echo "=== health gateway ==="
+          kubectl -n platform run "healthcheck-gateway-${{ github.run_id }}" \
+            --image=curlimages/curl:8.5.0 \
+            --restart=Never \
+            --rm -i \
+            --command -- \
+            sh -c "curl -sf http://gateway-api.platform.svc.cluster.local/health && echo && curl -sf http://gateway-api.platform.svc.cluster.local/ready && echo"

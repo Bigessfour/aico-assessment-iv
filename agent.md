@@ -73,8 +73,8 @@ Mark a checklist item done only after it exists on the branch you are working an
 - [x] Recommendations + forecasting slices (PR #2 merged to `main`)
 - [x] Routing isolation evidence: each pod `ENDPOINT_NAME` matches its team (recorded in History.md)
 - [ ] Terraform lifecycle documented for whatever we actually manage (even if that is only tags/S3 state/K8s objects — not the cluster)
-- [ ] Real `deploy.yml` (PR: `feature/real-deploy-workflow` — matrix build → GHCR → apply → verify)
-- [ ] Ops dashboard with three teams, not `Example Service`
+- [x] Real `deploy.yml` (merged; Actions green on main)
+- [x] Ops dashboard with three teams + live poll + version + test-predict (branch `feature/gateway-and-dashboard`)
 - [ ] Architecture diagram + teardown docs in README or `docs/`
 
 ---
@@ -98,8 +98,8 @@ Mark a checklist item done only after it exists on the branch you are working an
 
 | Bonus | Status | Done when |
 |-------|--------|-----------|
-| Gateway | pending | `services/gateway` FastAPI: `POST /predict/{team}` and `GET /health` aggregating team `/health`. In-cluster DNS to `*.svc.cluster.local`. One port-forward for the demo. |
-| Model versioning / A/B | pending | **Do not** create extra SageMaker endpoints unless they already exist. Implement weighted routing **inside the gateway or one team service** via ConfigMap (`MODEL_VARIANT=A\|B`, `WEIGHT_A=80`) and label responses with `variant`. Dashboard can flip weights. That is enough to talk to. |
+| Gateway | done (this PR) | `services/gateway` FastAPI: `POST /predict/{team}` and aggregate `GET /health`. In-cluster DNS. Demo: `kubectl -n platform port-forward svc/gateway-api 18080:80`. |
+| Model versioning / A/B | done (this PR) | ConfigMap `WEIGHT_A` on gateway; responses labeled `variant` A\|B. No extra SageMaker endpoints. |
 
 ### 4. GitHub Actions
 
@@ -115,8 +115,8 @@ Mark a checklist item done only after it exists on the branch you are working an
 | Bonus | Status | Done when |
 |-------|--------|-----------|
 | React framework | **satisfied by starter** | Do not replace with Flask/Streamlit. Enhance in place. |
-| Clean styling | pending | Tailwind **or** MUI — pick one. |
-| Features | pending | Live poll (5–10s) + version field + test-request form against gateway (covers three of the four allowed features). |
+| Clean styling | done (this PR) | Tailwind CDN + IBM Plex; slate/teal ops theme. |
+| Features | done (this PR) | Live poll (~7s) + version field + test-request form against gateway. |
 
 ### 6. Docs / presentation
 

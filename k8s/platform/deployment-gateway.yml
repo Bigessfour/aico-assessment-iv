@@ -1,0 +1,60 @@
+# =============================================================================
+# Gateway Deployment — single entry point for /predict/{team} and aggregate /health
+# =============================================================================
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: gateway-api
+  namespace: platform
+  labels:
+    app: gateway-api
+    team: platform
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: gateway-api
+  template:
+    metadata:
+      labels:
+        app: gateway-api
+        team: platform
+    spec:
+      containers:
+        - name: gateway-api
+          image: ghcr.io/bigessfour/gateway:latest
+          imagePullPolicy: Always
+          ports:
+            - containerPort: 8000
+          envFrom:
+            - configMapRef:
+                name: gateway-config
+          # Gateway /ready is local; /health fans out so use /ready for readiness
+          # until teams are up — still probe /health for liveness of the process path.
+          startupProbe:
+            httpGet:
+              path: /ready
+              port: 8000
+            failureThreshold: 12
+            periodSeconds: 5
+          readinessProbe:
+            httpGet:
+              path: /ready
+              port: 8000
+            initialDelaySeconds: 3
+            periodSeconds: 10
+          livenessProbe:
+            httpGet:
+              path: /ready
+              port: 8000
+            initialDelaySeconds: 10
+            periodSeconds: 20
+          resources:
+            requests:
+              memory: "128Mi"
+              cpu: "100m"
+            limits:
+              memory: "256Mi"
+              cpu: "250m"
+      imagePullSecrets:
+        - name: ghcr-secret

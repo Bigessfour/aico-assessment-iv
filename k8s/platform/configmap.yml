@@ -1,0 +1,20 @@
+# =============================================================================
+# Gateway ConfigMap — team Service DNS + A/B weight (non-secret)
+# =============================================================================
+# Talking points:
+#   - FRAUD_URL etc. use in-cluster DNS (no hardcoded pod IPs).
+#   - WEIGHT_A implements the A/B bonus without new SageMaker endpoints.
+#   - Change weight → kubectl apply → rollout restart deployment/gateway-api.
+# =============================================================================
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: gateway-config
+  namespace: platform
+data:
+  FRAUD_URL: "http://fraud-api.fraud.svc.cluster.local"
+  RECOMMENDATIONS_URL: "http://recommendations-api.recommendations.svc.cluster.local"
+  FORECASTING_URL: "http://forecasting-api.forecasting.svc.cluster.local"
+  WEIGHT_A: "80"
+  HTTP_TIMEOUT_SECONDS: "15"
+  CORS_ORIGINS: "*"

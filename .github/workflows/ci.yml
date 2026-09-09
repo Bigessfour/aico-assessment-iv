@@ -1,5 +1,5 @@
 # Lightweight PR checks — does NOT deploy to EKS.
-# Full build/push/apply lives in deploy.yml (still a template until Phase 4).
+# Full build/push/apply lives in deploy.yml.
 name: CI
 
 on:
@@ -23,7 +23,8 @@ jobs:
       - name: Syntax-check FastAPI apps
         run: |
           set -e
-          for svc in fraud-detection recommendations forecasting; do
+          # Team wrappers + platform gateway
+          for svc in fraud-detection recommendations forecasting gateway; do
             python -m py_compile "services/${svc}/app.py"
             echo "ok services/${svc}/app.py"
           done
@@ -37,6 +38,16 @@ jobs:
               echo "ok k8s/${team}/${f}.yml"
             done
           done
+          for f in namespace configmap deployment-gateway service-gateway dashboard quota; do
+            test -f "k8s/platform/${f}.yml"
+            echo "ok k8s/platform/${f}.yml"
+          done
+
+      - name: Confirm dashboard sources present
+        run: |
+          test -f dashboard/src/App.jsx
+          test -f dashboard/nginx.conf
+          echo "ok dashboard"
 
       - name: Confirm History.md present
         run: test -f History.md && head -n 5 History.md
