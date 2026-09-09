@@ -145,7 +145,7 @@ If you presented tomorrow as-is: live platform carries **K8s / SageMaker / Actio
 - [x] Real `deploy.yml` green on `main`
 - [x] Gateway + ops dashboard on `main`
 - [ ] **Merge PR #5** so Terraform is on `main` (or re-land if abandoned)
-- [ ] **Rewrite README** (scenario, mermaid, setup, deploy, verify, teardown) — currently stale
+- [x] **Rewrite README** (scenario, mermaid, setup, deploy, verify, teardown) — on docs PR; merge to `main`
 - [ ] Architecture diagram + teardown (README and/or `docs/architecture.md`)
 - [ ] `docs/presentation-notes.md`
 

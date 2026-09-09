@@ -186,7 +186,12 @@ kubectl -n platform port-forward svc/gateway-api 18080:80
 curl http://127.0.0.1:18080/health
 ```
 
+## README rewrite (2026-09-08)
+
+Replaced the starter README with grader-facing docs: Scenario 1, mermaid architecture, real repo layout, deploy/verify/teardown, dashboard demo, Terraform caveats, presentation honesty on A/B labels.
+
 ## Still to do (platform)
+
 
 - Terraform lifecycle + optional remote state / k8s provider
 - Controlled failure demo script
