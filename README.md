@@ -84,7 +84,11 @@ k8s/
   platform/             # gateway + dashboard
 .github/workflows/
   ci.yml                # PR/main: Python syntax + manifest presence
-  deploy.yml            # main: matrix build → GHCR → EKS apply → verify
+  deploy.yml            # matrix build → GHCR → EKS apply → verify (+ git_ref)
+  lint-manifests.yml    # dry-run client
+  rollback.yml          # rollout undo
+  destroy-workloads.yml # our namespaces only
+  chain-after-ci.yml    # workflow_run → verify.sh
 terraform/              # namespaces, ConfigMaps, platform RBAC + remote state
 scripts/                # verify.sh, demo-failure.sh, bootstrap-tf-backend.sh
 History.md              # issues hit + fixes
@@ -115,7 +119,7 @@ Optional local env scaffolding: `./start.sh` (creates gitignored `.env` / `.env.
 
 ### Automated (preferred)
 
-Push to `main` (paths under `services/`, `dashboard/`, `k8s/`, or `deploy.yml`) or run **Actions → Build and Deploy → Run workflow**.
+Push to `main` (paths under `services/`, `dashboard/`, `k8s/`, or `deploy.yml`) or run **Actions → Build and Deploy → Run workflow** (optional `teams`, optional `git_ref` for branch/SHA targeting).
 
 The workflow:
 
@@ -124,6 +128,17 @@ The workflow:
 3. Applies manifests (**never** applies `secret.example.yml`)
 4. Pins deployments to the commit SHA tag
 5. Verifies rollouts, `ENDPOINT_NAME` isolation, and in-cluster `/health` + `/ready`
+
+### Bonus workflows
+
+| Workflow | Purpose |
+|----------|---------|
+| **Lint manifests** | `kubectl apply --dry-run=client` on PRs touching `k8s/` |
+| **Rollback** | `rollout undo` for teams / platform (optional revision) |
+| **Destroy workloads** | Deletes only our four namespaces after confirm `destroy-my-workloads` |
+| **Chain after CI** | On successful CI push to `main`, runs `scripts/verify.sh` |
+
+Never use Destroy against the shared EKS cluster itself.
 
 ### Manual (laptop)
 

@@ -1,0 +1,39 @@
+# Lint Kubernetes manifests with client-side dry-run (no cluster mutation).
+# Bonus: additional workflow for manifest lint.
+name: Lint manifests
+
+on:
+  pull_request:
+    paths:
+      - "k8s/**"
+      - ".github/workflows/lint-manifests.yml"
+  workflow_dispatch:
+
+jobs:
+  lint:
+    name: kubectl dry-run client
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install kubectl
+        uses: azure/setup-kubectl@v4
+        with:
+          version: "v1.30.0"
+
+      - name: Dry-run apply all team + platform manifests
+        run: |
+          set -euo pipefail
+          for team in fraud recommendations forecasting; do
+            echo "=== dry-run $team ==="
+            for f in namespace.yml quota.yml configmap.yml deployment.yml service.yml; do
+              kubectl apply --dry-run=client -f "k8s/${team}/${f}"
+            done
+            # Never apply secret.example.yml for real; still validate shape
+            kubectl apply --dry-run=client -f "k8s/${team}/secret.example.yml"
+          done
+          echo "=== dry-run platform ==="
+          for f in namespace.yml quota.yml configmap.yml deployment-gateway.yml service-gateway.yml dashboard.yml; do
+            kubectl apply --dry-run=client -f "k8s/platform/${f}"
+          done
+          echo "LINT OK"

@@ -11,7 +11,7 @@ Ship a **demoable internal ML platform** that a grader can reproduce from the RE
 
 Score the **required rubric first**. Bonuses are stretch after the required vertical is green. A late or incomplete required slice costs more than a missing bonus.
 
-**Current risk is shrinking:** README + Terraform are on `main`. Controlled-failure bonus is scripted. Next: Actions bonuses + speaker notes.
+**Current risk is shrinking:** platform + docs + Terraform + failure demos + Actions bonuses are in. Next: speaker notes.
 
 Scenario (locked): **Scenario 1 — ML Platform**  
 Teams / SageMaker endpoints:
@@ -49,8 +49,8 @@ Latest **CI** and **Build and Deploy** on `main` succeeded ([deploy run](https:/
 
 | Slice | Status | Notes |
 |-------|--------|-------|
-| Controlled failure demo | **This PR** | `scripts/demo-failure.sh` + `verify.sh`; History evidence; always restore |
-| Actions bonuses | **Thin** | No rollback, no `workflow_run` chain, no lint/destroy-workloads. `workflow_dispatch` `teams` input is a start |
+| Controlled failure demo | **Done** | `scripts/demo-failure.sh` + `verify.sh`; History evidence; always restore |
+| Actions bonuses | **This PR** | rollback, lint, destroy-workloads, chain-after-ci, deploy `git_ref` |
 | Presentation notes | **Missing** | `docs/presentation-notes.md` |
 | Leftover remote branches | Cleanup | Delete merged feature branch leftovers |
 
@@ -151,7 +151,7 @@ If you presented tomorrow as-is: live platform + README carry **K8s / SageMaker 
 
 ### Bonuses still open
 
-- [ ] Actions: rollback (`workflow_dispatch`), `workflow_run` chain, lint dry-run, namespaced destroy
+- [ ] `docs/presentation-notes.md` + leftover remote branch cleanup
 
 ### Bonuses done (say accurately)
 
@@ -160,6 +160,7 @@ If you presented tomorrow as-is: live platform + README carry **K8s / SageMaker 
 - [x] React ops UI + Tailwind styling + live poll + version + test-predict
 - [x] Terraform remote state S3 + DynamoDB lock + K8s provider (ns/ConfigMaps/RBAC)
 - [x] `scripts/verify.sh` + `scripts/demo-failure.sh` (quota + ready) with History.md evidence + restore
+- [x] Actions: rollback, lint dry-run, namespaced destroy, `workflow_run` chain, `git_ref` targeting
 
 ---
 
@@ -167,11 +168,8 @@ If you presented tomorrow as-is: live platform + README carry **K8s / SageMaker 
 
 The live platform slice is standing. Prioritize grader-facing clarity, then close Terraform on `main`, then cheap bonuses.
 
-1. **Land PR #5** (this branch) so Terraform is on `main`; README already points at `terraform/README.md`.
-2. `scripts/demo-failure.sh` + `scripts/verify.sh` + History.md evidence (always restore).
-3. Actions bonuses: rollback + lint + namespaced-destroy (+ optional `workflow_run` chain).
-4. `docs/presentation-notes.md`; delete leftover merged remote feature branches.
-5. Keep `agent.md` ground truth honest after each merge (this file).
+1. `docs/presentation-notes.md`; delete leftover merged remote feature branches.
+2. Keep `agent.md` ground truth honest after each merge (this file).
 
 Remote state: S3 `aico-iv-steve-tfstate`, DynamoDB `aico-iv-steve-tflock`. K8s provider manages ns/ConfigMaps/RBAC; Deployments stay YAML.
 

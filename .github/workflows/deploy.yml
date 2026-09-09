@@ -3,6 +3,8 @@
 # Secrets are created from GitHub Actions secrets (never from secret.example.yml).
 #
 # Builds team wrappers + platform gateway + ops-dashboard.
+# Branch targeting: workflow_dispatch input git_ref.
+# Chained workflows: see chain-after-ci.yml (CI success → in-cluster verify).
 name: Build and Deploy
 
 on:
@@ -19,6 +21,10 @@ on:
         description: "Comma-separated teams to deploy (default: all)"
         required: false
         default: "fraud,recommendations,forecasting"
+      git_ref:
+        description: "Git ref to build/deploy (branch, tag, or SHA). Empty = this workflow SHA."
+        required: false
+        default: ""
 
 env:
   AWS_REGION: us-east-1
@@ -50,7 +56,35 @@ jobs:
           - service: ops-dashboard
             context: dashboard
     steps:
+      - name: Resolve checkout ref
+        id: meta
+        run: |
+          set -euo pipefail
+          if [ "${{ github.event_name }}" = "workflow_dispatch" ] && [ -n "${{ github.event.inputs.git_ref }}" ]; then
+            REF="${{ github.event.inputs.git_ref }}"
+            SHA=""
+          else
+            REF="${{ github.sha }}"
+            SHA="${{ github.sha }}"
+          fi
+          echo "ref=$REF" >> "$GITHUB_OUTPUT"
+          echo "image_sha=$SHA" >> "$GITHUB_OUTPUT"
+          echo "Checkout ref=$REF"
+
       - uses: actions/checkout@v4
+        with:
+          ref: ${{ steps.meta.outputs.ref }}
+
+      - name: Finalize image SHA
+        id: sha
+        run: |
+          set -euo pipefail
+          SHA="${{ steps.meta.outputs.image_sha }}"
+          if [ -z "$SHA" ]; then
+            SHA="$(git rev-parse HEAD)"
+          fi
+          echo "image_sha=$SHA" >> "$GITHUB_OUTPUT"
+          echo "Image tag SHA=$SHA"
 
       - name: Set up QEMU (amd64 on Actions runners is native; keep for consistency)
         uses: docker/setup-qemu-action@v3
@@ -73,7 +107,7 @@ jobs:
           push: true
           tags: |
             ${{ env.REGISTRY }}/${{ env.IMAGE_OWNER }}/${{ matrix.service }}:latest
-            ${{ env.REGISTRY }}/${{ env.IMAGE_OWNER }}/${{ matrix.service }}:${{ github.sha }}
+            ${{ env.REGISTRY }}/${{ env.IMAGE_OWNER }}/${{ matrix.service }}:${{ steps.sha.outputs.image_sha }}
           cache-from: type=gha
           cache-to: type=gha,mode=max
 
@@ -82,7 +116,33 @@ jobs:
     needs: build
     runs-on: ubuntu-latest
     steps:
+      - name: Resolve checkout ref
+        id: meta
+        run: |
+          set -euo pipefail
+          if [ "${{ github.event_name }}" = "workflow_dispatch" ] && [ -n "${{ github.event.inputs.git_ref }}" ]; then
+            REF="${{ github.event.inputs.git_ref }}"
+            SHA=""
+          else
+            REF="${{ github.sha }}"
+            SHA="${{ github.sha }}"
+          fi
+          echo "ref=$REF" >> "$GITHUB_OUTPUT"
+          echo "image_sha=$SHA" >> "$GITHUB_OUTPUT"
+
       - uses: actions/checkout@v4
+        with:
+          ref: ${{ steps.meta.outputs.ref }}
+
+      - name: Finalize image SHA
+        id: sha
+        run: |
+          set -euo pipefail
+          SHA="${{ steps.meta.outputs.image_sha }}"
+          if [ -z "$SHA" ]; then
+            SHA="$(git rev-parse HEAD)"
+          fi
+          echo "image_sha=$SHA" >> "$GITHUB_OUTPUT"
 
       - name: Configure AWS credentials
         uses: aws-actions/configure-aws-credentials@v4
@@ -169,6 +229,7 @@ jobs:
       - name: Pin deployments to this commit's image digest tag
         run: |
           set -euo pipefail
+          SHA="${{ steps.sha.outputs.image_sha }}"
           declare -A IMG=(
             [fraud]=fraud-detection
             [recommendations]=recommendations
@@ -177,14 +238,14 @@ jobs:
           IFS=',' read -ra TEAM_ARR <<< "${{ steps.teams.outputs.list }}"
           for team in "${TEAM_ARR[@]}"; do
             team="$(echo "$team" | xargs)"
-            image="${REGISTRY}/${IMAGE_OWNER}/${IMG[$team]}:${{ github.sha }}"
+            image="${REGISTRY}/${IMAGE_OWNER}/${IMG[$team]}:${SHA}"
             kubectl -n "$team" set image "deployment/${team}-api" "${team}-api=${image}"
           done
 
           kubectl -n platform set image deployment/gateway-api \
-            "gateway-api=${REGISTRY}/${IMAGE_OWNER}/gateway:${{ github.sha }}"
+            "gateway-api=${REGISTRY}/${IMAGE_OWNER}/gateway:${SHA}"
           kubectl -n platform set image deployment/ops-dashboard \
-            "ops-dashboard=${REGISTRY}/${IMAGE_OWNER}/ops-dashboard:${{ github.sha }}"
+            "ops-dashboard=${REGISTRY}/${IMAGE_OWNER}/ops-dashboard:${SHA}"
 
       - name: Verify rollouts
         run: |
