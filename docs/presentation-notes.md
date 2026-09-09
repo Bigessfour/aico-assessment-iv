@@ -33,11 +33,21 @@ GitHub Actions builds `linux/amd64` → GHCR → applies `k8s/{fraud,recommendat
 ## Rubric map (say if asked)
 
 - **K8s 30%** — three ns, ConfigMaps/Secrets, three probes, quota/LimitRange; bonus failure scripts.
-- **SageMaker 25%** — three wrappers, isolation, 502/timeout path; gateway + A/B label.
-- **Actions 15%** — real deploy + verify; bonuses: rollback, lint, destroy-workloads, CI chain, `git_ref`.
-- **Terraform 10%** — vars/outputs/lifecycle + remote state + K8s provider.
-- **UI 10%** — React + Tailwind CDN; poll, version, test-predict.
+- **SageMaker 25%** — three wrappers, isolation, 502/timeout path; gateway + weighted A/B with `X-Model-Variant` forwarded downstream.
+- **Actions 15%** — real deploy + verify; bonuses: rollback, lint, destroy-workloads, CI chain, `git_ref`, Terraform plan/apply/destroy, 18 pytest tests + dashboard build on every PR.
+- **Terraform 10%** — vars/outputs/lifecycle + remote state; provisions real AWS resources (six SSM parameters as the endpoint catalog, a CloudWatch log group) plus namespaces, RBAC, and `platform-metadata` via the Kubernetes provider.
+- **UI 10%** — React; all four optional features: poll, model version, test-predict, request counts.
 - **Docs 10%** — README mermaid, History.md, these notes.
+
+## What went wrong (say it before they find it)
+
+Volunteering these reads as engineering judgment. Each one is a sentence, not a story — state it, say the fix, move on.
+
+- **Lint workflow failed on Actions.** Used `kubectl apply --dry-run=client`, which still wants an API server, so it tried `localhost:8080`. Switched to kubeconform, which validates against Kubernetes schemas fully offline.
+- **A deploy failed on `verify.sh`.** The script forced `AWS_PROFILE=codeplatoon`, which exists on my laptop and not on a runner. Now it only defaults that profile when `AWS_ACCESS_KEY_ID` is unset, so the same script works in both places.
+- **Terraform provisioned zero AWS resources at first.** It only read data sources and managed Kubernetes objects — which is the *bonus*, not the requirement. Added SSM parameters and a log group, and wired `verify.sh` to fail on drift between them and the live ConfigMaps.
+- **No `.dockerignore`, found while writing the study guide.** The dashboard image installs dependencies then copies the build context, so a local build would have overwritten Linux `node_modules` with the Mac's. CI never caught it because a fresh checkout has no `node_modules` — it would have failed live, on a laptop, during this demo.
+- **Red "Chain after CI" runs in the Actions tab.** That workflow was renamed to `chain-after-deploy`; those runs are from the old name and cannot recur. Left in place rather than deleted.
 
 ## Do not claim
 
