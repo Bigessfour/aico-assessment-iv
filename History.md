@@ -272,6 +272,13 @@ Re-pulled the upstream brief (`codeplatoon-devops/aico-assessment-iv`) — byte-
 
 **"Destroy infra" bonus covered workloads only.** Added `terraform.yml`: `fmt` + `validate` + `plan` on PRs touching `terraform/`, and a dispatch with `plan` / `apply` / `destroy`, where destroy requires typing `destroy-my-infra`.
 
+### Evidence (2026-09-09)
+
+- PR [#15](https://github.com/Bigessfour/aico-assessment-iv/pull/15) merged with all six checks green: validate, pytest, dashboard build, kubeconform, terraform plan, GitGuardian
+- `Terraform` workflow, `action=apply` → [run](https://github.com/Bigessfour/aico-assessment-iv/actions/runs/34408822611): *Apply complete! Resources: 8 added, 0 changed, 0 destroyed* — six SSM parameters, the platform log group, and `platform-metadata`. No IAM friction on `ssm:PutParameter` or `logs:CreateLogGroup`
+- `Build and Deploy` → [run](https://github.com/Bigessfour/aico-assessment-iv/actions/runs/34408887075): VERIFY OK, including the new drift check (`OK fraud → aico-iv-fraud matches /ml-platform/dev/fraud/endpoint_name`, same for recs and forecast) and gateway `0.2.0` reporting `variants {a: baseline, b: candidate}` with the counter block
+- Each team `/health` now carries its `model_version` (`fraud-xgboost-2026.09.1`, `recs-factorization-2026.09.1`, `forecast-deepar-2026.09.1`)
+
 ## Still to do (platform)
 
 - Presentation rehearsal and slide/demo track
