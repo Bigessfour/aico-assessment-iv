@@ -14,7 +14,10 @@
 # =============================================================================
 set -euo pipefail
 
-export AWS_PROFILE="${AWS_PROFILE:-codeplatoon}"
+# Prefer env credentials (GitHub Actions). Default local profile only when no keys.
+if [[ -z "${AWS_ACCESS_KEY_ID:-}" ]]; then
+  export AWS_PROFILE="${AWS_PROFILE:-codeplatoon}"
+fi
 MODE="${1:-}"
 NS=fraud
 DEPLOY=fraud-api
