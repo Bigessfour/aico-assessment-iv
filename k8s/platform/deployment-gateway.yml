@@ -1,6 +1,19 @@
 # =============================================================================
 # Gateway Deployment — single entry point for /predict/{team} and aggregate /health
 # =============================================================================
+# Talking points:
+#   - Lives in `platform`, not in a team namespace: it belongs to the platform
+#     team and would otherwise count against a team's ResourceQuota.
+#   - envFrom gateway-config supplies the three team Service URLs and the A/B
+#     weight. No SageMaker Secret here — the gateway never calls AWS itself, it
+#     only proxies to team services. Least privilege by construction.
+#   - All three probes hit /ready on purpose (see the note below): /health fans
+#     out to the teams, so using it for probes would make the gateway restart
+#     whenever a *team* is unhealthy. Gateway liveness must depend only on the
+#     gateway.
+#   - Same 100m/128Mi request and 250m/256Mi limit as the team pods, which keeps
+#     the platform namespace inside its own quota with room for the dashboard.
+# =============================================================================
 apiVersion: apps/v1
 kind: Deployment
 metadata:

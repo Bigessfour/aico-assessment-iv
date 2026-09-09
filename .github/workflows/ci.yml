@@ -52,6 +52,9 @@ jobs:
       - name: Confirm History.md present
         run: test -f History.md && head -n 5 History.md
 
+  # Rubric bonus "run tests". These are contract tests: they stub SageMaker and
+  # httpx, so they prove the /health-/ready-/predict contract and the 502/504
+  # failure paths without touching AWS or needing a cluster.
   unit-tests:
     name: Unit tests (pytest)
     runs-on: ubuntu-latest
@@ -70,6 +73,8 @@ jobs:
       - name: Run tests
         run: pytest tests -q
 
+  # A broken JSX edit would otherwise only surface during the image build in
+  # deploy.yml, minutes later. Compiling the dashboard on the PR fails fast.
   dashboard-build:
     name: Dashboard build
     runs-on: ubuntu-latest

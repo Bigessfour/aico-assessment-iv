@@ -1,5 +1,13 @@
 # Rollback Deployments to the previous ReplicaSet (or a chosen revision).
 # Manual only — does not rebuild images.
+#
+# How this works: every time a Deployment's pod template changes, Kubernetes
+# keeps the old ReplicaSet around instead of deleting it. `kubectl rollout undo`
+# scales the previous ReplicaSet back up and the current one down, so recovery
+# is a control-plane operation measured in seconds — no rebuild, no registry
+# pull, no pipeline run. That is why rollback is the fastest incident response
+# available and why the image tags are pinned to commit SHAs: each revision in
+# the history maps to an exact commit.
 name: Rollback
 
 on:

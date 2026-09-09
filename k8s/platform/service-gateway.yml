@@ -1,6 +1,17 @@
 # =============================================================================
 # Gateway Service — ClusterIP (demo via kubectl port-forward svc/gateway-api)
 # =============================================================================
+# Talking points:
+#   - This is the one name the rest of the platform depends on:
+#     gateway-api.platform.svc.cluster.local. The dashboard's nginx proxies
+#     /api/* here, so the browser never needs three team URLs.
+#   - ClusterIP keeps it internal. A LoadBalancer would create a real (billable)
+#     AWS load balancer on a shared class cluster — avoided on purpose.
+#   - selector app=gateway-api is the whole routing rule: the Service forwards
+#     to any pod carrying that label AND currently passing its readiness probe.
+#   - port 80 -> targetPort 8000: callers use the conventional HTTP port while
+#     uvicorn keeps listening on 8000 inside the container.
+# =============================================================================
 apiVersion: v1
 kind: Service
 metadata:

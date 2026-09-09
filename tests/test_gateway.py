@@ -25,7 +25,14 @@ class FakeResponse:
 
 
 class FakeClient:
-    """Async httpx stand-in. Records the last POST so we can assert on headers."""
+    """Async httpx stand-in. Records the last POST so we can assert on headers.
+
+    The gateway calls team services with `async with httpx.AsyncClient() as c`,
+    so a substitute has to implement the async context-manager protocol
+    (`__aenter__` / `__aexit__`) plus the `get` and `post` methods it uses.
+    Swapping this in means the tests exercise real routing logic with no
+    network, no cluster, and no SageMaker.
+    """
 
     last_post = None
     post_error = None
