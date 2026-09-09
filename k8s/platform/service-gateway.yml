@@ -1,0 +1,19 @@
+# =============================================================================
+# Gateway Service — ClusterIP (demo via kubectl port-forward svc/gateway-api)
+# =============================================================================
+apiVersion: v1
+kind: Service
+metadata:
+  name: gateway-api
+  namespace: platform
+  labels:
+    app: gateway-api
+    team: platform
+spec:
+  type: ClusterIP
+  selector:
+    app: gateway-api
+  ports:
+    - protocol: TCP
+      port: 80
+      targetPort: 8000

@@ -1,0 +1,14 @@
+# =============================================================================
+# platform namespace — shared gateway + (later) dashboard surface
+# =============================================================================
+# Talking points:
+#   - Keeps cross-team routing out of fraud/recs/forecast namespaces.
+#   - Still on the shared class cluster — we only create THIS namespace.
+# =============================================================================
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: platform
+  labels:
+    team: platform
+    app.kubernetes.io/part-of: ml-platform

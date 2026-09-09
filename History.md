@@ -165,11 +165,30 @@ Replacing the upstream template with:
 
 Does **not** create or destroy the class EKS cluster.
 
+## Gateway + ops dashboard (2026-09-08)
+
+Added platform namespace with:
+
+- `services/gateway` — aggregate `/health`, `POST /predict/{team}`, A/B `WEIGHT_A` labeling
+- React ops dashboard (Tailwind) — live poll, version, test-predict; nginx `/api` → gateway
+- Images: `ghcr.io/bigessfour/gateway:latest`, `ghcr.io/bigessfour/ops-dashboard:latest` (linux/amd64)
+- Deploy path extended in `deploy.yml` for gateway + dashboard
+
+Verified aggregate health shows all three teams healthy with correct SageMaker endpoint names.
+
+### Demo
+
+```bash
+kubectl -n platform port-forward svc/ops-dashboard 3000:80
+# open http://localhost:3000
+# or gateway only:
+kubectl -n platform port-forward svc/gateway-api 18080:80
+curl http://127.0.0.1:18080/health
+```
+
 ## Still to do (platform)
 
-- Land real `deploy.yml` PR and confirm Actions green on `main`
-- Gateway + React ops dashboard (required UI + SageMaker gateway bonus)
 - Terraform lifecycle + optional remote state / k8s provider
 - Controlled failure demo script
 - Actions bonuses (rollback, branch targeting, lint/destroy-workloads)
-- Scenario 1 README + architecture diagram + teardown + presentation notes
+- Scenario 1 README + architecture diagram + teardown + presentation notes + helper scripts

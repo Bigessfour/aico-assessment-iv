@@ -1,0 +1,6 @@
+# Gateway runtime deps:
+#   fastapi/uvicorn — HTTP API
+#   httpx — async proxy calls to team ClusterIP services
+fastapi
+uvicorn
+httpx
