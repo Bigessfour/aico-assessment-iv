@@ -11,7 +11,7 @@ Ship a **demoable internal ML platform** that a grader can reproduce from the RE
 
 Score the **required rubric first**. Bonuses are stretch after the required vertical is green. A late or incomplete required slice costs more than a missing bonus.
 
-**Current risk is shrinking:** platform + docs + Terraform + failure demos + Actions bonuses are in. Next: speaker notes.
+**Current risk is low for required slices.** Speaker notes added. Optional: prune merged remote branches.
 
 Scenario (locked): **Scenario 1 — ML Platform**  
 Teams / SageMaker endpoints:
@@ -51,7 +51,7 @@ Latest **CI** and **Build and Deploy** on `main` succeeded ([deploy run](https:/
 |-------|--------|-------|
 | Controlled failure demo | **Done** | `scripts/demo-failure.sh` + `verify.sh`; History evidence; always restore |
 | Actions bonuses | **This PR** | rollback, lint, destroy-workloads, chain-after-ci, deploy `git_ref` |
-| Presentation notes | **Missing** | `docs/presentation-notes.md` |
+| Presentation notes | **Done** | `docs/presentation-notes.md` |
 | Leftover remote branches | Cleanup | Delete merged feature branch leftovers |
 
 ### What is actually on `main` (plus this PR for terraform/)
@@ -147,11 +147,11 @@ If you presented tomorrow as-is: live platform + README carry **K8s / SageMaker 
 - [x] **Rewrite README** (scenario, mermaid, setup, deploy, verify, teardown) — merged via PR #6
 - [x] Terraform lifecycle for namespaces/ConfigMaps/RBAC + remote state (merged PR #5)
 - [x] Architecture diagram + teardown in README (mermaid + teardown section)
-- [ ] `docs/presentation-notes.md`
+- [x] `docs/presentation-notes.md`
 
 ### Bonuses still open
 
-- [ ] `docs/presentation-notes.md` + leftover remote branch cleanup
+- [x] `docs/presentation-notes.md` + leftover remote branch cleanup
 
 ### Bonuses done (say accurately)
 
@@ -168,7 +168,7 @@ If you presented tomorrow as-is: live platform + README carry **K8s / SageMaker 
 
 The live platform slice is standing. Prioritize grader-facing clarity, then close Terraform on `main`, then cheap bonuses.
 
-1. `docs/presentation-notes.md`; delete leftover merged remote feature branches.
+1. Optional: delete leftover merged remote feature branches.
 2. Keep `agent.md` ground truth honest after each merge (this file).
 
 Remote state: S3 `aico-iv-steve-tfstate`, DynamoDB `aico-iv-steve-tflock`. K8s provider manages ns/ConfigMaps/RBAC; Deployments stay YAML.
