@@ -24,16 +24,17 @@ jobs:
       - name: Dry-run apply all team + platform manifests
         run: |
           set -euo pipefail
+          # --validate=false: client dry-run must not require a live API server OpenAPI
           for team in fraud recommendations forecasting; do
             echo "=== dry-run $team ==="
             for f in namespace.yml quota.yml configmap.yml deployment.yml service.yml; do
-              kubectl apply --dry-run=client -f "k8s/${team}/${f}"
+              kubectl apply --dry-run=client --validate=false -f "k8s/${team}/${f}"
             done
             # Never apply secret.example.yml for real; still validate shape
-            kubectl apply --dry-run=client -f "k8s/${team}/secret.example.yml"
+            kubectl apply --dry-run=client --validate=false -f "k8s/${team}/secret.example.yml"
           done
           echo "=== dry-run platform ==="
           for f in namespace.yml quota.yml configmap.yml deployment-gateway.yml service-gateway.yml dashboard.yml; do
-            kubectl apply --dry-run=client -f "k8s/platform/${f}"
+            kubectl apply --dry-run=client --validate=false -f "k8s/platform/${f}"
           done
           echo "LINT OK"
