@@ -225,7 +225,7 @@ Lesson: a wrong-but-nonempty `ENDPOINT_NAME` still passes `/ready` (client const
 
 ## Actions bonuses (2026-09-08)
 
-- `lint-manifests.yml` — `kubectl apply --dry-run=client` for all team + platform manifests
+- `lint-manifests.yml` — offline `kubeconform` (kubectl dry-run needed a live API on Actions)
 - `rollback.yml` — `workflow_dispatch` rollout undo (optional revision)
 - `destroy-workloads.yml` — deletes only `fraud` / `recommendations` / `forecasting` / `platform` after confirm phrase `destroy-my-workloads` (never the class EKS cluster)
 - `chain-after-deploy.yml` — `workflow_run` after **Build and Deploy** success runs `scripts/verify.sh`
@@ -244,6 +244,10 @@ Addressed structural review findings:
 - Deleted seed `services/example` + `k8s/example`
 - Renamed/retargeted chain workflow: runs after **Build and Deploy** success (not every CI docs push)
 - `demo-failure.sh` restore is mode-specific (quota vs ready)
+
+## Lint fix (2026-09-08)
+
+`kubectl apply --dry-run=client` failed on Actions (`localhost:8080`). Switched lint workflow to **kubeconform**.
 
 ## Still to do (platform)
 

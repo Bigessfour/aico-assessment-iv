@@ -85,7 +85,7 @@ k8s/
 .github/workflows/
   ci.yml                # PR/main: Python syntax + manifest presence
   deploy.yml            # matrix build → GHCR → EKS apply → verify (+ git_ref)
-  lint-manifests.yml    # dry-run client
+  lint-manifests.yml    # kubeconform offline
   rollback.yml          # rollout undo
   destroy-workloads.yml # our namespaces only
   chain-after-deploy.yml # after Build and Deploy → verify.sh
@@ -134,7 +134,7 @@ The workflow:
 | Workflow | Purpose |
 |----------|---------|
 | **Chain after deploy** | After **Build and Deploy** succeeds, runs `scripts/verify.sh` again |
-| **Lint manifests** | `kubectl apply --dry-run=client` on PRs touching `k8s/` |
+| **Lint manifests** | `kubeconform` offline schema check on PRs touching `k8s/` |
 | **Rollback** | `rollout undo` for teams / platform (optional revision) |
 | **Destroy workloads** | Deletes only our four namespaces after confirm `destroy-my-workloads` |
 
