@@ -1,15 +1,77 @@
+# Required CI/CD path: build → GHCR → EKS apply → verify.
+# Does NOT create/destroy the class EKS cluster.
+# Secrets are created from GitHub Actions secrets (never from secret.example.yml).
 name: Build and Deploy
 
 on:
   push:
     branches: [main]
+    paths:
+      - "services/**"
+      - "k8s/**"
+      - ".github/workflows/deploy.yml"
+  workflow_dispatch:
+    inputs:
+      teams:
+        description: "Comma-separated teams to deploy (default: all)"
+        required: false
+        default: "fraud,recommendations,forecasting"
 
 env:
   AWS_REGION: us-east-1
-  EKS_CLUSTER: <class-cluster-name>
+  EKS_CLUSTER: k8s-training-cluster
+  REGISTRY: ghcr.io
+  IMAGE_OWNER: bigessfour
+
+permissions:
+  contents: read
+  packages: write
 
 jobs:
-  build-and-deploy:
+  build:
+    name: Build ${{ matrix.service }}
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - service: fraud-detection
+            team: fraud
+          - service: recommendations
+            team: recommendations
+          - service: forecasting
+            team: forecasting
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up QEMU (amd64 on Actions runners is native; keep for consistency)
+        uses: docker/setup-qemu-action@v3
+
+      - name: Set up Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Login to GHCR
+        uses: docker/login-action@v3
+        with:
+          registry: ${{ env.REGISTRY }}
+          username: ${{ github.actor }}
+          password: ${{ secrets.GHCR_TOKEN }}
+
+      - name: Build and push linux/amd64
+        uses: docker/build-push-action@v6
+        with:
+          context: services/${{ matrix.service }}
+          platforms: linux/amd64
+          push: true
+          tags: |
+            ${{ env.REGISTRY }}/${{ env.IMAGE_OWNER }}/${{ matrix.service }}:latest
+            ${{ env.REGISTRY }}/${{ env.IMAGE_OWNER }}/${{ matrix.service }}:${{ github.sha }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+  deploy:
+    name: Deploy to EKS
+    needs: build
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -21,21 +83,121 @@ jobs:
           aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
           aws-region: ${{ env.AWS_REGION }}
 
-      - name: Login to GHCR
-        uses: docker/login-action@v3
+      - name: Install kubectl
+        uses: azure/setup-kubectl@v4
         with:
-          registry: ghcr.io
-          username: ${{ github.actor }}
-          password: ${{ secrets.GHCR_TOKEN }}
-
-      # -- Add build + push steps per service here --
+          version: "v1.30.0"
 
       - name: Update kubeconfig
-        run: aws eks update-kubeconfig --region ${{ env.AWS_REGION }} --name ${{ env.EKS_CLUSTER }}
-
-      # -- Add kubectl apply steps per team here --
-
-      - name: Verify rollout
         run: |
-          echo "Add rollout status checks here"
-          # kubectl rollout status deployment/example-service -n team-example
+          aws eks update-kubeconfig \
+            --region "${AWS_REGION}" \
+            --name "${EKS_CLUSTER}"
+
+      - name: Resolve team list
+        id: teams
+        run: |
+          TEAMS="${{ github.event.inputs.teams }}"
+          if [ -z "$TEAMS" ]; then
+            TEAMS="fraud,recommendations,forecasting"
+          fi
+          echo "list=$TEAMS" >> "$GITHUB_OUTPUT"
+          echo "Deploying teams: $TEAMS"
+
+      - name: Ensure namespace secrets (AWS + GHCR pull)
+        env:
+          AWS_ACCESS_KEY_ID_VAL: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          AWS_SECRET_ACCESS_KEY_VAL: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          GHCR_TOKEN: ${{ secrets.GHCR_TOKEN }}
+        run: |
+          set -euo pipefail
+          IFS=',' read -ra TEAM_ARR <<< "${{ steps.teams.outputs.list }}"
+          for team in "${TEAM_ARR[@]}"; do
+            team="$(echo "$team" | xargs)"
+            kubectl apply -f "k8s/${team}/namespace.yml"
+
+            kubectl -n "$team" create secret generic "${team}-aws-creds" \
+              --from-literal=AWS_ACCESS_KEY_ID="${AWS_ACCESS_KEY_ID_VAL}" \
+              --from-literal=AWS_SECRET_ACCESS_KEY="${AWS_SECRET_ACCESS_KEY_VAL}" \
+              --dry-run=client -o yaml | kubectl apply -f -
+
+            kubectl -n "$team" create secret docker-registry ghcr-secret \
+              --docker-server=ghcr.io \
+              --docker-username="${{ github.actor }}" \
+              --docker-password="${GHCR_TOKEN}" \
+              --dry-run=client -o yaml | kubectl apply -f -
+          done
+
+      - name: Apply manifests (skip secret.example.yml)
+        run: |
+          set -euo pipefail
+          IFS=',' read -ra TEAM_ARR <<< "${{ steps.teams.outputs.list }}"
+          for team in "${TEAM_ARR[@]}"; do
+            team="$(echo "$team" | xargs)"
+            echo "=== apply $team ==="
+            kubectl apply -f "k8s/${team}/namespace.yml"
+            kubectl apply -f "k8s/${team}/quota.yml"
+            kubectl apply -f "k8s/${team}/configmap.yml"
+            kubectl apply -f "k8s/${team}/deployment.yml"
+            kubectl apply -f "k8s/${team}/service.yml"
+          done
+
+      - name: Pin deployments to this commit's image digest tag
+        run: |
+          set -euo pipefail
+          # Map team → image repo name
+          declare -A IMG=(
+            [fraud]=fraud-detection
+            [recommendations]=recommendations
+            [forecasting]=forecasting
+          )
+          IFS=',' read -ra TEAM_ARR <<< "${{ steps.teams.outputs.list }}"
+          for team in "${TEAM_ARR[@]}"; do
+            team="$(echo "$team" | xargs)"
+            image="${REGISTRY}/${IMAGE_OWNER}/${IMG[$team]}:${{ github.sha }}"
+            kubectl -n "$team" set image "deployment/${team}-api" "${team}-api=${image}"
+          done
+
+      - name: Verify rollouts
+        run: |
+          set -euo pipefail
+          IFS=',' read -ra TEAM_ARR <<< "${{ steps.teams.outputs.list }}"
+          for team in "${TEAM_ARR[@]}"; do
+            team="$(echo "$team" | xargs)"
+            echo "=== rollout $team ==="
+            kubectl -n "$team" rollout status "deployment/${team}-api" --timeout=180s
+            kubectl -n "$team" get pods,svc
+          done
+
+      - name: Verify ENDPOINT_NAME routing isolation
+        run: |
+          set -euo pipefail
+          expect_fraud=aico-iv-fraud
+          expect_recommendations=aico-iv-recs
+          expect_forecasting=aico-iv-forecast
+
+          IFS=',' read -ra TEAM_ARR <<< "${{ steps.teams.outputs.list }}"
+          for team in "${TEAM_ARR[@]}"; do
+            team="$(echo "$team" | xargs)"
+            var="expect_${team}"
+            expected="${!var}"
+            actual="$(kubectl -n "$team" exec "deploy/${team}-api" -- \
+              python -c 'import os; print(os.environ.get("ENDPOINT_NAME",""))')"
+            echo "$team ENDPOINT_NAME=$actual (expected $expected)"
+            test "$actual" = "$expected"
+          done
+
+      - name: Verify /health and /ready via in-cluster curl Job
+        run: |
+          set -euo pipefail
+          IFS=',' read -ra TEAM_ARR <<< "${{ steps.teams.outputs.list }}"
+          for team in "${TEAM_ARR[@]}"; do
+            team="$(echo "$team" | xargs)"
+            echo "=== health $team ==="
+            kubectl -n "$team" run "healthcheck-${team}-${{ github.run_id }}" \
+              --image=curlimages/curl:8.5.0 \
+              --restart=Never \
+              --rm -i \
+              --command -- \
+              sh -c "curl -sf http://${team}-api.${team}.svc.cluster.local/health && echo && curl -sf http://${team}-api.${team}.svc.cluster.local/ready && echo"
+          done

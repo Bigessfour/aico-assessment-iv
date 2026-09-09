@@ -20,19 +20,20 @@ AWS: profile `codeplatoon`, account `388691194728`, region `us-east-1`, cluster 
 
 ## Ground truth (do not invent a greener state)
 
-### `main` (as of 2026-09-08)
+### `main` (as of 2026-09-08, post PR #2 merge)
 
-- Fraud vertical slice only: FastAPI + GHCR linux/amd64 image + `k8s/fraud/` (ns, ConfigMap, Secret example, probes, quota/LimitRange, ClusterIP).
-- `terraform/main.tf` is the upstream **skeleton** (provider + variables + two outputs). No remote state, no K8s provider, no real resources.
-- `.github/workflows/deploy.yml` is still the upstream **template** (`EKS_CLUSTER: <class-cluster-name>`, stub build/apply/verify).
-- `.github/workflows/ci.yml` syntax-checks fraud only.
+- Three team slices on disk: `fraud` / `recommendations` / `forecasting` FastAPI + `k8s/<team>/` (ns, ConfigMap, Secret example, probes, quota/LimitRange, ClusterIP).
+- Live cluster (when last verified): all three namespaces Ready with isolated `ENDPOINT_NAME` values.
+- `terraform/main.tf` is still the upstream **skeleton** (provider + variables + two outputs). No remote state, no K8s provider, no real resources.
+- `.github/workflows/deploy.yml`: replaced on branch `feature/real-deploy-workflow` — real matrix build → GHCR → apply → verify. Until that PR merges, `main` may still have the old template.
+- `.github/workflows/ci.yml` syntax-checks all three services + manifest trees.
 - `dashboard/` is the upstream React + Vite **shell** (hardcoded Example Service, one-shot fetch, no Tailwind/MUI).
 - README is still a starter blurb. No architecture diagram, no teardown runbook.
 
-### Open work
+### Naming
 
-- PR #2 `feature/teams-recommendations-forecasting` duplicates the fraud pattern for recommendations + forecasting and extends CI. **Merge or finish this before starting bonuses.**
-- Namespaces in manifests are `fraud` / `recommendations` / `forecasting` (not `aico-iv-*`). `aico-iv-*` are **SageMaker endpoint names**. Do not rename namespaces unless updating every apply/verify command.
+- Namespaces in manifests are `fraud` / `recommendations` / `forecasting` (not `aico-iv-*`).
+- `aico-iv-*` are **SageMaker endpoint names** only. Do not rename namespaces unless updating every apply/verify command.
 
 Mark a checklist item done only after it exists on the branch you are working and is recorded in `History.md`.
 
@@ -69,10 +70,10 @@ Mark a checklist item done only after it exists on the branch you are working an
 ## Required baseline checklist
 
 - [x] Fraud FastAPI + EKS slice with probes, ConfigMap, Secrets, quota (on `main`)
-- [ ] Recommendations + forecasting slices (PR #2 — merge first)
-- [ ] Routing isolation evidence: each pod `ENDPOINT_NAME` matches its team; `/predict` response includes that endpoint
+- [x] Recommendations + forecasting slices (PR #2 merged to `main`)
+- [x] Routing isolation evidence: each pod `ENDPOINT_NAME` matches its team (recorded in History.md)
 - [ ] Terraform lifecycle documented for whatever we actually manage (even if that is only tags/S3 state/K8s objects — not the cluster)
-- [ ] Real `deploy.yml` (replace placeholders; matrix or repeated steps for 3 services + dashboard)
+- [ ] Real `deploy.yml` (PR: `feature/real-deploy-workflow` — matrix build → GHCR → apply → verify)
 - [ ] Ops dashboard with three teams, not `Example Service`
 - [ ] Architecture diagram + teardown docs in README or `docs/`
 
