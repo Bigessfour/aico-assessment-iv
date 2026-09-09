@@ -10,7 +10,57 @@
 # =============================================================================
 set -euo pipefail
 
-export AWS_PROFILE="${AWS_PROFILE:-codeplatoon}"
+# #region agent log
+_dbg() {
+  python3 -c "
+import json,time,os
+p='/Users/stephenmckitrick/Assessment 4/.cursor/debug-d8a8cd.log'
+d={
+  'sessionId':'d8a8cd',
+  'timestamp':int(time.time()*1000),
+  'location':'scripts/verify.sh',
+  'message':'''$1''',
+  'hypothesisId':'''$2''',
+  'runId':os.environ.get('DEBUG_RUN_ID','pre-fix'),
+  'data':{
+    'AWS_PROFILE':os.environ.get('AWS_PROFILE'),
+    'has_access_key':bool(os.environ.get('AWS_ACCESS_KEY_ID')),
+    'has_secret_key':bool(os.environ.get('AWS_SECRET_ACCESS_KEY')),
+    'AWS_CONFIG_FILE':os.environ.get('AWS_CONFIG_FILE'),
+    'AWS_SHARED_CREDENTIALS_FILE':os.environ.get('AWS_SHARED_CREDENTIALS_FILE'),
+    'extra':'''${3:-}''',
+  },
+}
+open(p,'a').write(json.dumps(d)+'\n')
+" 2>/dev/null || true
+}
+_dbg "verify.sh entry before profile default" "A" "raw_profile=${AWS_PROFILE-<<unset>>}"
+# #endregion
+
+# GitHub Actions injects AWS_ACCESS_KEY_ID via configure-aws-credentials and has no
+# ~/.aws/config profile named codeplatoon. Forcing AWS_PROFILE=codeplatoon there
+# breaks `aws eks get-token` / kubectl. Only default a local profile when no keys.
+if [[ -z "${AWS_ACCESS_KEY_ID:-}" ]]; then
+  export AWS_PROFILE="${AWS_PROFILE:-codeplatoon}"
+fi
+
+# #region agent log
+_profile_exists="no"
+if [[ -n "${AWS_CONFIG_FILE:-}" ]]; then
+  _cfg="$AWS_CONFIG_FILE"
+else
+  _cfg="${HOME}/.aws/config"
+fi
+if [[ -n "${AWS_PROFILE:-}" && -f "$_cfg" ]] && grep -q "\\[profile ${AWS_PROFILE}\\]\\|\\[${AWS_PROFILE}\\]" "$_cfg" 2>/dev/null; then
+  _profile_exists="yes"
+fi
+_dbg "after AWS_PROFILE policy" "A" "profile_exists_in_config=${_profile_exists};config=${_cfg};profile_now=${AWS_PROFILE-<<unset>>}"
+_aws_out="$(aws sts get-caller-identity 2>&1 | head -c 200 | tr '\n' ' ' || true)"
+_dbg "aws sts get-caller-identity" "B" "${_aws_out}"
+_k_out="$(kubectl get ns fraud -o name 2>&1 | head -c 200 | tr '\n' ' ' || true)"
+_dbg "kubectl get ns fraud" "A" "${_k_out}"
+# #endregion
+
 DEFAULT_TEAMS=(fraud recommendations forecasting)
 ALLOWED="fraud recommendations forecasting"
 
