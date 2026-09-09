@@ -8,15 +8,15 @@ Talking points (presentation):
     aico-iv-forecast (not fraud/recs) so routing stays correct.
 """
 
+import json
+import os
 from typing import Optional
 
-from fastapi import FastAPI, Header, HTTPException
-from fastapi.responses import JSONResponse
+import boto3
 from botocore.config import Config
 from botocore.exceptions import BotoCoreError, ClientError
-import boto3
-import os
-import json
+from fastapi import FastAPI, Header, HTTPException
+from fastapi.responses import JSONResponse
 
 app = FastAPI(title="forecasting", version="0.1.0")
 
@@ -124,6 +124,8 @@ def predict(payload: dict, x_model_variant: Optional[str] = Header(default=None)
         }
     except (BotoCoreError, ClientError, TimeoutError) as e:
         # 502 = bad gateway: we are up, but SageMaker (or network) failed
-        raise HTTPException(status_code=502, detail=f"sagemaker invoke failed: {e}") from e
+        raise HTTPException(
+            status_code=502, detail=f"sagemaker invoke failed: {e}"
+        ) from e
     except Exception as e:
         raise HTTPException(status_code=502, detail=str(e)) from e
